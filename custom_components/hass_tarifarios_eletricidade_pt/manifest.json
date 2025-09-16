@@ -1,0 +1,9 @@
+{
+  "domain": "hass_tarifarios_eletricidade_pt",
+  "name": "Tarifários Eletricidade PT",
+  "version": "0.0.1",
+  "documentation": "https://www.home-assistant.io/integrations/",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@your-github-username"]
+}
