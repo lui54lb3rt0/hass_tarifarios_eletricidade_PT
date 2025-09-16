@@ -1,5 +1,5 @@
 """Sensor platform for Tarifários Eletricidade PT."""
-from homeassistant.helpers.entity import Entity, SensorEntity
+from homeassistant.helpers.entity import Entity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -8,6 +8,7 @@ import os
 
 from .const import DOMAIN
 from custom_components.hass_tarifarios_eletricidade_pt.data_loader import get_filtered_dataframe
+from homeassistant.components.sensor import SensorEntity
 
 
 def create_entities_from_dataframe(df, user_selected_pot_cont):

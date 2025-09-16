@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2025-09-17
+### Changed
+- Fixed import for SensorEntity to use homeassistant.components.sensor for compatibility
+- Integrated DataFrame loading via data_loader module for cleaner entity setup
+
 ## [1.0.0] - 2025-09-17
 ### Added
 - Initial release of Tarifários Eletricidade PT Home Assistant integration
