@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2025-09-17
+
+### Fixed
+- Added `async_setup_entry` to `__init__.py` to support config flow setup and resolve integration setup errors.
+
+### Changed
+- Incremented version to 1.5.0.
+
 ## [1.4.0] - 2025-09-17
 
 ### Fixed
