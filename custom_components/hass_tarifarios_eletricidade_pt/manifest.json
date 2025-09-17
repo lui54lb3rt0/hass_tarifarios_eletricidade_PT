@@ -1,7 +1,7 @@
 {
   "domain": "hass_tarifarios_eletricidade_pt",
   "name": "Tarifários Eletricidade PT",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "documentation": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/blob/main/README.md",
   "requirements": [],
   "dependencies": [],

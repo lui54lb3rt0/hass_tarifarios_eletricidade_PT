@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-09-17
+
+### Added
+- Config flow now presents a dropdown selector for Potência contratada (`pot_cont`) during integration setup.
+
+### Changed
+- Incremented version to 1.3.0.
+
 ## [1.2.0] - 2025-09-17
 
 ### Changed
