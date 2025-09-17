@@ -1,35 +1,34 @@
 # Tarifários Eletricidade PT Home Assistant Integration
 
-This integration automatically downloads, processes, and analyzes commercial electricity offers for Portugal from ERSE's official simulator. It joins and cleans provider CSV data, allowing users to filter by contracted power (Potência contratada) and creates a Home Assistant entity for each offer. Each entity exposes all relevant offer details as attributes, enabling users to compare tariffs and find the best fit for their consumption profile directly in Home Assistant.
-
-## Features
-- Downloads and processes official ERSE CSV data
-- Joins commercial conditions and price tables
-- Filters offers by contracted power (Pot_Cont)
-- Removes all columns related to gas (GN)
-- Creates a sensor entity for each offer (CODProposta)
-- Exposes all offer details as entity attributes
-- Enables tariff comparison and selection in Home Assistant
+This integration allows you to compare electricity tariffs from Portuguese providers and find the best fit for your consumption profile. It automatically downloads, processes, and exposes tariff offers as sensor entities in Home Assistant.
 
 ## Installation
 
 1. Copy the `custom_components/hass_tarifarios_eletricidade_pt` folder into your Home Assistant `custom_components` directory.
 2. Restart Home Assistant.
 
-## Configuration
+## Setup
 
-Add the following to your `configuration.yaml`:
+**Do not add anything to `configuration.yaml`.**
 
-```yaml
-sensor:
-  - platform: hass_tarifarios_eletricidade_pt
-```
+1. Go to **Settings → Devices & Services → Add Integration** in Home Assistant.
+2. Search for `Tarifários Eletricidade PT` and follow the setup wizard.
+3. Select your contracted power (`Potência contratada`) and other options as prompted.
+
+## Features
+
+- Automatically downloads and processes the latest tariff offers.
+- Creates a sensor entity for each offer, with all details as attributes.
+- Allows filtering by contracted power during setup.
+- Exports filtered offers to HTML for easy viewing.
 
 ## Files
 - `manifest.json`: Integration metadata
 - `__init__.py`: Integration setup
-- `const.py`: Constants
-- `sensor.py`: Example sensor platform
+- `sensor.py`: Sensor platform and entity creation
+- `data_loader.py`: Data processing and filtering
+- `config_flow.py`: UI-based configuration flow
 
-## License
-MIT
+## Changelog
+
+See `CHANGELOG.md` for version history.

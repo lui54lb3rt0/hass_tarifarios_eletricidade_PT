@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-09-17
+
+### Changed
+- Updated README to clarify setup via Integrations UI, not configuration.yaml.
+- Improved documentation for installation and configuration steps.
+
+### Fixed
+- Minor documentation corrections.
+
 ## [1.1.0] - 2025-09-17
 ### Changed
 - Fixed import for SensorEntity to use homeassistant.components.sensor for compatibility
