@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2025-09-17
+
+### Fixed
+- Config flow now correctly creates the entry after selecting Potência contratada (`pot_cont`), allowing setup to complete.
+
+### Changed
+- Incremented version to 1.4.0.
+
 ## [1.3.0] - 2025-09-17
 
 ### Added
