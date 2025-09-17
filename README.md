@@ -5,7 +5,14 @@ This integration allows you to compare electricity tariffs from Portuguese provi
 ## Installation
 
 1. Copy the `custom_components/hass_tarifarios_eletricidade_pt` folder into your Home Assistant `custom_components` directory.
-2. Restart Home Assistant.
+2. Ensure you have the following files in the integration folder:
+   - `manifest.json`
+   - `__init__.py`
+   - `const.py`
+   - `sensor.py`
+   - `data_loader.py`
+   - `config_flow.py`
+3. Restart Home Assistant.
 
 ## Setup
 
@@ -13,18 +20,21 @@ This integration allows you to compare electricity tariffs from Portuguese provi
 
 1. Go to **Settings → Devices & Services → Add Integration** in Home Assistant.
 2. Search for `Tarifários Eletricidade PT` and follow the setup wizard.
-3. Select your contracted power (`Potência contratada`) and other options as prompted.
+3. Select your contracted power (`Potência contratada`) and choose tariff codes as prompted.
 
 ## Features
 
-- Automatically downloads and processes the latest tariff offers.
+- Automatically downloads and processes the latest tariff offers from online sources.
 - Creates a sensor entity for each offer, with all details as attributes.
-- Allows filtering by contracted power during setup.
+- Allows filtering by contracted power and tariff code during setup.
 - Exports filtered offers to HTML for easy viewing.
+- Configuration via Home Assistant UI (Config Flow).
 
 ## Files
+
 - `manifest.json`: Integration metadata
 - `__init__.py`: Integration setup
+- `const.py`: Constants and domain definition
 - `sensor.py`: Sensor platform and entity creation
 - `data_loader.py`: Data processing and filtering
 - `config_flow.py`: UI-based configuration flow
@@ -32,3 +42,13 @@ This integration allows you to compare electricity tariffs from Portuguese provi
 ## Changelog
 
 See `CHANGELOG.md` for version history.
+
+## Troubleshooting
+
+- Ensure all required files are present in the `custom_components/hass_tarifarios_eletricidade_pt` directory.
+- Check Home Assistant logs for integration errors.
+- Make sure your Home Assistant instance has internet access to download tariff data.
+
+## License
+
+See `LICENSE` for details.

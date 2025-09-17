@@ -7,7 +7,7 @@ import pandas as pd
 import os
 
 from .const import DOMAIN
-from custom_components.hass_tarifarios_eletricidade_pt.data_loader import get_filtered_dataframe
+from custom_components.hass_tarifarios_eletricidade_pt.data_loader import get_filtered_dataframe, process_csv
 from homeassistant.components.sensor import SensorEntity
 
 
@@ -54,3 +54,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     
     entities = create_entities_from_dataframe(df, user_selected_pot_cont, selected_codigos)
     async_add_entities(entities)
+
+    # New code using process_csv
+    # Get selected codes from config entry if available, else None for all
+    selected_codigos = entry.data.get("codigos_oferta", None)
+    selected_pot_cont = entry.data.get("pot_cont", None)
+    df = process_csv(codigos_oferta=selected_codigos)
+    if selected_pot_cont is not None:
+        df = df[df['Potência contratada'] == selected_pot_cont]
+    entities = []
+    for _, row in df.iterrows():
+        cod_proposta = row["Código da oferta comercial"]
+        attributes = row.drop("Código da oferta comercial").to_dict()
+        entities.append(TarifarioSensor(cod_proposta, attributes))
+    async_add_entities(entities)
+
+class TarifarioSensor(SensorEntity):
+    def __init__(self, cod_proposta, attributes):
+        self._attr_name = f"Tarifa {cod_proposta}"
+        self._attr_unique_id = cod_proposta
+        self._attr_state = "available"
+        self._attr_extra_state_attributes = attributes

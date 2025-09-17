@@ -5,76 +5,40 @@ import os
 import pandas as pd
 from lxml import html
 
-def download_and_extract_zip(zip_url, extract_to):
-    """Download ZIP from URL and extract CSV files."""
-    print(f"Downloading ZIP from: {zip_url}")
-    response = requests.get(zip_url)
+def fetch_csv(url):
+    """Fetch a CSV file from a URL and return a pandas DataFrame."""
+    response = requests.get(url)
     response.raise_for_status()
-    if not zip_url.lower().endswith('.zip'):
-        print("Warning: The URL does not end with .zip")
-    if response.content[:2] != b'PK':
-        print("Error: The downloaded file does not look like a ZIP. First bytes:", response.content[:100])
-        raise zipfile.BadZipFile("Downloaded file is not a ZIP archive")
-    with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-        z.extractall(extract_to)
-        return [os.path.join(extract_to, name) for name in z.namelist() if name.endswith('.csv')]
+    return pd.read_csv(io.StringIO(response.text), sep=';', on_bad_lines='skip')
 
-def analyze_csv(csv_path):
-    df = pd.read_csv(csv_path, sep=';', on_bad_lines='skip')
-    print(f"Summary for {csv_path}:")
-    print(df.describe())
+def analyze_csv(df):
+    """Print summary statistics for a DataFrame."""
+    print(df.describe(include='all'))
 
-def join_and_pivot(cond_path, precos_path):
-    cond_df = pd.read_csv(cond_path, sep=';', on_bad_lines='skip')
-    precos_df = pd.read_csv(precos_path, sep=';', on_bad_lines='skip')
+def join_and_analyze(cond_url, precos_url):
+    """Fetch, join, and analyze CondComerciais and Precos_ELEGN CSVs."""
+    cond_df = fetch_csv(cond_url)
+    precos_df = fetch_csv(precos_url)
     merged_df = pd.merge(cond_df, precos_df, on='COD_Proposta', how='inner')
-    pivot = merged_df.pivot_table(index='COD_Proposta', aggfunc='size')
     print("Merged DataFrame head:")
     print(merged_df.head())
-    print("Pivot Table:")
-    print(pivot)
-    return merged_df, pivot
+    analyze_csv(merged_df)
+    return merged_df
 
-def get_zip_link_from_xpath(page_url, xpath):
-    response = requests.get(page_url)
-    response.raise_for_status()
-    tree = html.fromstring(response.content)
-    zip_link = tree.xpath(xpath)
-    if zip_link:
-        href = zip_link[0].get('href') if hasattr(zip_link[0], 'get') else zip_link[0]
-        print(f"Extracted href from XPath: {href}")
-        if not href.startswith('http'):
-            href = page_url.rstrip('/') + '/' + href.lstrip('/')
-        print(f"Final ZIP URL: {href}")
-        return href
-    raise ValueError('ZIP link not found with the given XPath')
+def export_to_html(df, html_path='./data/output.html'):
+    """Export the given DataFrame to an HTML file."""
+    df.to_html(html_path, index=False, escape=False)
+    print(f"HTML file exported to {html_path}")
 
-def get_csv_link_and_label(page_url):
-    response = requests.get(page_url)
-    response.raise_for_status()
-    tree = html.fromstring(response.content)
-    anchor = tree.xpath('//a[contains(@class, "csvPath")]')
-    if anchor:
-        href = anchor[0].get('href')
-        label = anchor[0].xpath('.//span')[0].text_content().strip() if anchor[0].xpath('.//span') else anchor[0].text_content().strip()
-        print(f"Extracted href: {href}")
-        print(f"Extracted label: {label}")
-        if not href.startswith('http'):
-            href = page_url.rstrip('/') + '/' + href.lstrip('/')
-        return href, label
-    raise ValueError('CSV anchor not found on the page')
-
-def get_filtered_dataframe(codigos_oferta=None):
-    # Download and process the CSVs as before
-    zip_url = 'https://simuladorprecos.erse.pt/Admin/csvs/20250915%20162151%20CSV.zip'
-    extract_to = './data'
-    csv_files = download_and_extract_zip(zip_url, extract_to)
-    for csv_file in csv_files:
-        analyze_csv(csv_file)
-    cond_path = [f for f in csv_files if f.endswith('CondComerciais.csv')][0]
-    precos_path = [f for f in csv_files if f.endswith('Precos_ELEGN.csv')][0]
-    merged_df, pivot = join_and_pivot(cond_path, precos_path)
-    filtered_df = merged_df[merged_df['Fornecimento'] == 'ELE']
+def process_csv(codigos_oferta=None):
+    cond_url = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CCondComerciais.csv"
+    precos_url = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CPrecos_ELEGN.csv"
+    cond_df = fetch_csv(cond_url)
+    precos_df = fetch_csv(precos_url)
+    merged_df = pd.merge(cond_df, precos_df, on='COD_Proposta', how='inner')
+    filtered_df = merged_df[merged_df['Fornecimento'] == 'ELE']   
+    filtered_df = filtered_df[filtered_df['FiltroContratacao'].isin([100, 110, 111])]
+    filtered_df = filtered_df[filtered_df['Pot_Cont'] == '5,75']
     column_map = {
         # Precos_ELEGN
         'COM': 'Comercializador',
@@ -153,16 +117,22 @@ def get_filtered_dataframe(codigos_oferta=None):
         'TV4V': 'Tipo de energia (kWh)',
     }
     filtered_df = filtered_df.rename(columns=column_map)
+    filtered_df = filtered_df.drop(columns=['Escalão de consumo', 'Operador de rede', 'COM_y'])
     gn_columns = [col for col in filtered_df.columns if 'Gás Natural' in col or 'GN' in col]
     filtered_df = filtered_df.drop(columns=gn_columns)
-    html_path = './data/output.html'
-    filtered_df.to_html(html_path, index=False, escape=False)
-    print(f"HTML file exported to {html_path} (filtered, renamed, GN columns removed)")
-    # If codigos_oferta is provided, filter by it
     if codigos_oferta is not None and len(codigos_oferta) > 0:
         filtered_df = filtered_df[filtered_df['Código da oferta comercial'].isin(codigos_oferta)]
+    export_to_html(filtered_df)
     return filtered_df
 
-def get_codigos_oferta():
-    df = get_filtered_dataframe()
-    return sorted(df["Código da oferta comercial"].unique())
+"""""
+if __name__ == "__main__":
+    # Example usage: process all offers and export to HTML
+    df = process_csv()
+    print("Processed DataFrame:")
+    print(df.head())
+    # Optionally, process only specific offers:
+    # selected_codigos = ["12345", "67890"]
+    # df_filtered = process_csv(codigos_oferta=selected_codigos)
+    # print(df_filtered.head())
+"""""
