@@ -5,5 +5,5 @@ from homeassistant.config_entries import ConfigEntry
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tarifários Eletricidade PT from a config entry."""
-    await hass.config_entries.async_forward_entry_setup(entry, "sensor")
+    await hass.async_forward_entry_setup(entry, "sensor")
     return True
