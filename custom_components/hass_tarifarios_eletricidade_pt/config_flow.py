@@ -1,23 +1,24 @@
 import voluptuous as vol
 from homeassistant import config_entries
 from .const import DOMAIN
-
-pot_cont_values = ["3.45", "4.6", "5.75", "6.9", "10.35"]  # Replace with actual values
+from .data_loader import get_codigos_oferta
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Tarifários Eletricidade PT."""
 
     async def async_step_user(self, user_input=None):
+        codigo_oferta_list = get_codigos_oferta()
+        schema = vol.Schema({
+            vol.Required("codigos_oferta", default=[]): vol.All(
+                vol.In(codigo_oferta_list)
+            )
+        })
         if user_input is not None:
-            # Create the config entry and finish setup
             return self.async_create_entry(
-                title=f"Tarifários Eletricidade PT ({user_input['pot_cont']})",
+                title="Tarifários Eletricidade PT",
                 data=user_input,
             )
-        # Show the form if no input yet
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required("pot_cont", default=pot_cont_values[0]): vol.In(pot_cont_values)
-            }),
+            data_schema=schema,
         )

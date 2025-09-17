@@ -188,3 +188,8 @@ def get_filtered_dataframe(pot_cont_value=None):
         if pot_cont_value is not None:
             filtered_df = filtered_df[filtered_df['Potência contratada'] == pot_cont_value]
         return filtered_df
+
+def get_codigos_oferta():
+    # Load your DataFrame as usual
+    df = ...  # however you load/process your data
+    return sorted(df["Código da oferta comercial"].unique())

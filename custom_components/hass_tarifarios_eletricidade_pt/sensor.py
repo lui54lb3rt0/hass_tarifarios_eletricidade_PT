@@ -11,8 +11,10 @@ from custom_components.hass_tarifarios_eletricidade_pt.data_loader import get_fi
 from homeassistant.components.sensor import SensorEntity
 
 
-def create_entities_from_dataframe(df, user_selected_pot_cont):
+def create_entities_from_dataframe(df, user_selected_pot_cont, selected_codigos):
     filtered_df = df[df['Pot_Cont'] == user_selected_pot_cont]
+    if selected_codigos:
+        filtered_df = filtered_df[filtered_df["Código da oferta comercial"].isin(selected_codigos)]
     entities = []
     for _, row in filtered_df.iterrows():
         cod_proposta = row["Código da oferta comercial"]  # or the column name after renaming
@@ -45,5 +47,10 @@ class OfertaSensor(SensorEntity):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     user_selected_pot_cont = entry.options.get("pot_cont") or entry.data.get("pot_cont")
     df = get_filtered_dataframe(user_selected_pot_cont)
-    entities = create_entities_from_dataframe(df, user_selected_pot_cont)
+    
+    selected_codigos = entry.data.get("codigos_oferta", [])
+    if isinstance(selected_codigos, str):
+        selected_codigos = [c.strip() for c in selected_codigos.split(",")]
+    
+    entities = create_entities_from_dataframe(df, user_selected_pot_cont, selected_codigos)
     async_add_entities(entities)
