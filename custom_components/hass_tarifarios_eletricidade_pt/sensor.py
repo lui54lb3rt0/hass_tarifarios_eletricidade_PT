@@ -1,10 +1,10 @@
 """Sensor platform for Tarifários Eletricidade PT."""
-from homeassistant.helpers.entity import Entity
+from __future__ import annotations
+
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-import pandas as pd
-import os
 
 from .const import DOMAIN
 from custom_components.hass_tarifarios_eletricidade_pt.data_loader import get_filtered_dataframe, process_csv
@@ -45,6 +45,11 @@ class OfertaSensor(SensorEntity):
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up sensors for a config entry."""
+    data = hass.data[DOMAIN][entry.entry_id]
+    # Placeholder single sensor
+    async_add_entities([TarifarioResumoSensor(entry.entry_id, data)], True)
+
     user_selected_pot_cont = entry.options.get("pot_cont") or entry.data.get("pot_cont")
     df = get_filtered_dataframe(user_selected_pot_cont)
     
@@ -75,3 +80,21 @@ class TarifarioSensor(SensorEntity):
         self._attr_unique_id = cod_proposta
         self._attr_state = "available"
         self._attr_extra_state_attributes = attributes
+
+class TarifarioResumoSensor(Entity):
+    _attr_name = "Tarifários Eletricidade PT"
+    _attr_icon = "mdi:flash"
+
+    def __init__(self, entry_id: str, data: dict):
+        self._entry_id = entry_id
+        self._data = data
+        self._attr_unique_id = f"{entry_id}_resumo"
+        self._state = "ok"
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def extra_state_attributes(self):
+        return self._data

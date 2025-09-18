@@ -1,19 +1,28 @@
 """Tarifários Eletricidade PT Home Assistant Integration."""
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_platform
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+
+from .const import DOMAIN  # ensure DOMAIN = "hass_tarifarios_eletricidade_pt"
+
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the integration (empty, config flow only)."""
+    """Set up the integration (YAML not used)."""
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
-    """Set up a config entry for the integration."""
-    hass.data.setdefault("hass_tarifarios_eletricidade_pt", {})
-    hass.data["hass_tarifarios_eletricidade_pt"][entry.entry_id] = entry.data
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = entry.data
 
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "sensor")
-    )
-
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unload_ok
