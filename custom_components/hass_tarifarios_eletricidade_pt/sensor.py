@@ -43,10 +43,10 @@ def _clean(v):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     config_data = hass.data[DOMAIN][entry.entry_id]
-    timestamp = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(timezone.utc)  # datetime object (NOT string)
 
     # Summary sensor
-    async_add_entities([ResumoTarifariosSensor(entry.entry_id, config_data, timestamp)], True)
+    async_add_entities([ResumoTarifariosSensor(entry.entry_id, config_data, ts)], True)
 
     selected_codigos = entry.data.get("codigos_oferta")
     if isinstance(selected_codigos, str):
@@ -69,7 +69,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if df.empty:
         _LOGGER.warning("No rows after pot filter.")
         return
-
     if not code_col:
         _LOGGER.error("Code column not found. Available: %s", list(df.columns))
         return
@@ -82,10 +81,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for k, v in raw.items():
             attrs[_normalize(k)] = _clean(v)
         attrs["codigo_original"] = codigo
-        attrs["last_refresh"] = timestamp
         if pot_col:
             attrs["pot_cont_raw"] = row.get(pot_col)
-        entities.append(TarifaOfertaSensor(entry.entry_id, codigo, attrs, timestamp))
+        attrs["last_refresh_iso"] = ts.isoformat()
+        entities.append(TarifaOfertaSensor(entry.entry_id, codigo, attrs, ts))
 
     async_add_entities(entities, True)
 
@@ -94,15 +93,15 @@ class TarifaOfertaSensor(SensorEntity):
     _attr_icon = "mdi:flash"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, entry_id: str, codigo: str, attrs: dict, ts: str):
+    def __init__(self, entry_id: str, codigo: str, attrs: dict, ts: datetime):
         self._attr_name = f"Tarifa {codigo}"
         self._attr_unique_id = f"{entry_id}_{codigo}"
         self._attrs = attrs
-        self._ts = ts
+        self._ts = ts  # datetime object
 
     @property
     def native_value(self):
-        return self._ts
+        return self._ts  # HA will format timestamp
 
     @property
     def extra_state_attributes(self):
@@ -113,7 +112,7 @@ class ResumoTarifariosSensor(SensorEntity):
     _attr_icon = "mdi:flash"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, entry_id: str, data: dict, ts: str):
+    def __init__(self, entry_id: str, data: dict, ts: datetime):
         self._attr_name = "Tarifários Eletricidade PT"
         self._attr_unique_id = f"{entry_id}_resumo"
         self._data = dict(data)
@@ -126,5 +125,5 @@ class ResumoTarifariosSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         out = dict(self._data)
-        out["last_refresh"] = self._ts
+        out["last_refresh_iso"] = self._ts.isoformat()
         return out

@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2.0.1 - 2025-09-22
+- Corrigido erro de device_class=timestamp (agora usa datetime nativo em vez de string).
+
 ## 2.0.0 - 2025-09-22
 - Adicionado pipeline assíncrono (aiohttp + executor) para evitar bloqueio do loop.
 - Introduzido `async_process_csv` e remoção de chamadas síncronas `requests`.
