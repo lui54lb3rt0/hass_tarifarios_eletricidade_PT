@@ -17,7 +17,8 @@ from .data_loader import async_process_csv
 _LOGGER = logging.getLogger(__name__)
 
 CODE_COL_CANDIDATES = ["Código da oferta comercial", "COD_Proposta", "CODProposta"]
-POT_COL_CANDIDATES = ["Potência contratada", "Pot_Cont"]
+NAME_COL_CANDIDATES = ["NomeProposta", "Nome Proposta", "Nome"]  # priority for sensor display name
+POT_COL_CANDIDATES  = ["Potência contratada__norm", "Pot_Cont__norm", "Potência contratada", "Pot_Cont"]
 
 
 def _normalize(k: str) -> str:
@@ -41,34 +42,43 @@ def _clean(v):
     return v
 
 
+def _norm_pot(val):
+    if not val:
+        return None
+    return str(val).replace(",", ".").strip()
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    config_data = hass.data[DOMAIN][entry.entry_id]
-    ts = datetime.now(timezone.utc)  # datetime object (NOT string)
+    cfg = hass.data[DOMAIN][entry.entry_id]
+    ts = datetime.now(timezone.utc)
 
     # Summary sensor
-    async_add_entities([ResumoTarifariosSensor(entry.entry_id, config_data, ts)], True)
+    async_add_entities([ResumoTarifariosSensor(entry.entry_id, cfg, ts)], True)
 
-    selected_codigos = entry.data.get("codigos_oferta")
-    if isinstance(selected_codigos, str):
-        selected_codigos = [c.strip() for c in selected_codigos.split(",") if c.strip()]
-    pot_cont = entry.data.get("pot_cont")
+    sel_codes = entry.data.get("codigos_oferta")
+    if isinstance(sel_codes, str):
+        sel_codes = [c.strip() for c in sel_codes.split(",") if c.strip()]
+    pot_cont_cfg = _norm_pot(entry.data.get("pot_cont"))
 
-    df = await async_process_csv(hass, codigos_oferta=selected_codigos)
+    df = await async_process_csv(hass, codigos_oferta=sel_codes)
     if df is None or df.empty:
         _LOGGER.warning("async_process_csv returned empty.")
         return
 
     code_col = next((c for c in CODE_COL_CANDIDATES if c in df.columns), None)
-    pot_col = next((c for c in POT_COL_CANDIDATES if c in df.columns), None)
+    name_col = next((c for c in NAME_COL_CANDIDATES if c in df.columns), None)
+    pot_norm_col = next((c for c in POT_COL_CANDIDATES if c in df.columns), None)
 
-    if pot_cont and pot_col:
+    # Filter by potencia (only if normalized column present and config provided)
+    if pot_cont_cfg and pot_norm_col:
         before = len(df)
-        df = df[df[pot_col] == pot_cont]
-        _LOGGER.debug("Pot filter %s: %d -> %d rows", pot_cont, before, len(df))
+        df_filtered = df[df[pot_norm_col].astype(str) == pot_cont_cfg]
+        if df_filtered.empty:
+            _LOGGER.warning("Pot filter removed all rows (wanted %s). Keeping unfiltered set.", pot_cont_cfg)
+        else:
+            _LOGGER.debug("Pot filter %s: %d -> %d", pot_cont_cfg, before, len(df_filtered))
+            df = df_filtered
 
-    if df.empty:
-        _LOGGER.warning("No rows after pot filter.")
-        return
     if not code_col:
         _LOGGER.error("Code column not found. Available: %s", list(df.columns))
         return
@@ -76,25 +86,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entities = []
     for _, row in df.iterrows():
         codigo = str(row[code_col])
+        display_name = None
+        if name_col and row.get(name_col):
+            display_name = str(row[name_col]).strip()
+        if not display_name:
+            display_name = f"Tarifa {codigo}"
+
         raw = row.to_dict()
         attrs = {}
+        nonempty = 0
         for k, v in raw.items():
-            attrs[_normalize(k)] = _clean(v)
+            nk = _normalize(k)
+            cv = _clean(v)
+            attrs[nk] = cv
+            if cv not in (None, "", "nan"):
+                nonempty += 1
+
         attrs["codigo_original"] = codigo
-        if pot_col:
-            attrs["pot_cont_raw"] = row.get(pot_col)
+        attrs["display_name_source"] = name_col if name_col else "code"
         attrs["last_refresh_iso"] = ts.isoformat()
-        entities.append(TarifaOfertaSensor(entry.entry_id, codigo, attrs, ts))
+        attrs["debug_nonempty_attr_count"] = nonempty
+        if pot_norm_col and pot_norm_col in row:
+            attrs["potencia_norm"] = row[pot_norm_col]
+
+        entities.append(OfferSensor(entry.entry_id, codigo, display_name, attrs, ts))
 
     async_add_entities(entities, True)
 
 
-class TarifaOfertaSensor(SensorEntity):
+class OfferSensor(SensorEntity):
     _attr_icon = "mdi:flash"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, entry_id: str, codigo: str, attrs: dict, ts: datetime):
-        self._attr_name = f"Tarifa {codigo}"
+    def __init__(self, entry_id: str, codigo: str, name: str, attrs: dict, ts: datetime):
+        self._attr_name = name
         self._attr_unique_id = f"{entry_id}_{codigo}"
         self._attrs = attrs
         self._ts = ts  # datetime object
