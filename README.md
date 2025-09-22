@@ -1,54 +1,92 @@
-# Tarifários Eletricidade PT Home Assistant Integration
+# Tarifários Eletricidade PT (Home Assistant)
 
-This integration allows you to compare electricity tariffs from Portuguese providers and find the best fit for your consumption profile. It automatically downloads, processes, and exposes tariff offers as sensor entities in Home Assistant.
+Integração custom para carregar, filtrar e expor tarifários de eletricidade (Portugal) como sensores no Home Assistant.
 
-## Installation
+## Funcionalidades
 
-1. Copy the `custom_components/hass_tarifarios_eletricidade_pt` folder into your Home Assistant `custom_components` directory.
-2. Ensure you have the following files in the integration folder:
-   - `manifest.json`
+- Download assíncrono (não bloqueante) de:
+  - CondComerciais.csv
+  - Precos_ELEGN.csv
+- Junção automática dos datasets
+- Filtro por:
+  - Potência contratada
+  - Lista de códigos de oferta (COD_Proposta)
+  - Apenas fornecimento ELE
+- Criação de:
+  - 1 sensor resumo (estado = timestamp última atualização)
+  - 1 sensor por oferta selecionada (estado = timestamp; todos os campos do CSV normalizados como atributos)
+- Normalização de nomes de atributos (snake_case, remoção de acentos e símbolos)
+- Suporte a recarregamento removendo e readicionando a integração
+
+## Instalação
+
+1. Copiar pasta `custom_components/hass_tarifarios_eletricidade_pt` para o diretório `config/custom_components` do Home Assistant.
+2. Confirmar ficheiros:
    - `__init__.py`
+   - `manifest.json`
    - `const.py`
+   - `config_flow.py`
    - `sensor.py`
    - `data_loader.py`
-   - `config_flow.py`
-3. Restart Home Assistant.
+3. Reiniciar Home Assistant.
+4. Adicionar via: Definições → Dispositivos e Serviços → Adicionar Integração → “Tarifários Eletricidade PT”.
 
-## Setup
+## Configuração (UI)
 
-**Do not add anything to `configuration.yaml`.**
+Campos:
+- Potência contratada (ex: `5.75`)
+- Lista de códigos de oferta (um ou vários)
 
-1. Go to **Settings → Devices & Services → Add Integration** in Home Assistant.
-2. Search for `Tarifários Eletricidade PT` and follow the setup wizard.
-3. Select your contracted power (`Potência contratada`) and choose tariff codes as prompted.
+Após concluir:
+- Sensor resumo: `sensor.tarifarios_electricidade_pt`
+- Sensores por oferta: `sensor.tarifa_<COD_Proposta>`
 
-## Features
+## Atributos dos Sensores de Oferta
 
-- Automatically downloads and processes the latest tariff offers from online sources.
-- Creates a sensor entity for each offer, with all details as attributes.
-- Allows filtering by contracted power and tariff code during setup.
-- Exports filtered offers to HTML for easy viewing.
-- Configuration via Home Assistant UI (Config Flow).
+Incluem todas as colunas resultantes do DataFrame (normalizadas):
+- codigo_original
+- pot_cont_raw
+- last_refresh
+- demais campos (termos fixos, energia, condições, links, etc.)
 
-## Files
+## Estado dos Sensores
 
-- `manifest.json`: Integration metadata
-- `__init__.py`: Integration setup
-- `const.py`: Constants and domain definition
-- `sensor.py`: Sensor platform and entity creation
-- `data_loader.py`: Data processing and filtering
-- `config_flow.py`: UI-based configuration flow
+O estado de cada sensor (resumo e ofertas) é o carimbo temporal (UTC ISO8601) da última atualização.
 
-## Changelog
+## Atualização
 
-See `CHANGELOG.md` for version history.
+Para aplicar alterações de código:
+1. Atualizar ficheiros
+2. Incrementar `version` em `manifest.json`
+3. Reiniciar Home Assistant
+4. Se necessário, remover e readicionar a integração
 
-## Troubleshooting
+## Resolução de Problemas
 
-- Ensure all required files are present in the `custom_components/hass_tarifarios_eletricidade_pt` directory.
-- Check Home Assistant logs for integration errors.
-- Make sure your Home Assistant instance has internet access to download tariff data.
+| Problema | Causa provável | Ação |
+|----------|----------------|------|
+| Só vejo poucos atributos | DataFrame filtrado demais | Ativar debug (ver abaixo) |
+| Aviso de blocking I/O | Uso antigo de requests | Já corrigido (usa aiohttp + executor) |
+| Sem sensores de oferta | Filtro pot_cont removeu todas as linhas | Verificar valor configurado |
 
-## License
+### Debug
 
-See `LICENSE` for details.
+Adicionar em `configuration.yaml`:
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.hass_tarifarios_eletricidade_pt: debug
+```
+
+Reiniciar e verificar Logs → procurar por “async_process_csv”.
+
+## Roadmap
+
+- Atualizações periódicas (DataUpdateCoordinator)
+- Métrica derivada (melhor preço vs média)
+- Suporte gás (opcional)
+
+## Licença
+
+Ver `LICENSE`.

@@ -1,138 +1,71 @@
-import requests
-import zipfile
-import io
-import os
+import asyncio
+from io import StringIO
 import pandas as pd
-from lxml import html
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-def fetch_csv(url):
-    """Fetch a CSV file from a URL and return a pandas DataFrame."""
-    response = requests.get(url)
-    response.raise_for_status()
-    return pd.read_csv(io.StringIO(response.text), sep=';', on_bad_lines='skip')
+COND_COMERCIAIS_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CCondComerciais.csv"
+PRECOS_ELEGN_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CPrecos_ELEGN.csv"
 
-def analyze_csv(df):
-    """Print summary statistics for a DataFrame."""
-    print(df.describe(include='all'))
+# Keep (or expand) your column_map if you want renaming; for now keep raw to show all attributes.
+# column_map = {...}
 
-def join_and_analyze(cond_url, precos_url):
-    """Fetch, join, and analyze CondComerciais and Precos_ELEGN CSVs."""
-    cond_df = fetch_csv(cond_url)
-    precos_df = fetch_csv(precos_url)
-    merged_df = pd.merge(cond_df, precos_df, on='COD_Proposta', how='inner')
-    print("Merged DataFrame head:")
-    print(merged_df.head())
-    analyze_csv(merged_df)
-    return merged_df
+async def _async_fetch_text(hass: HomeAssistant, url: str) -> str:
+    session = async_get_clientsession(hass)
+    async with session.get(url, timeout=30) as resp:
+        resp.raise_for_status()
+        return await resp.text()
 
-def export_to_html(df, html_path='./data/output.html'):
-    """Export the given DataFrame to an HTML file."""
-    df.to_html(html_path, index=False, escape=False)
-    print(f"HTML file exported to {html_path}")
+async def _async_read_csv(hass: HomeAssistant, csv_text: str) -> pd.DataFrame:
+    # Run pandas in executor to avoid blocking
+    return await asyncio.to_thread(pd.read_csv, StringIO(csv_text), sep=';', dtype=str, na_filter=True)
 
-def process_csv(codigos_oferta=None):
-    cond_url = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CCondComerciais.csv"
-    precos_url = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CPrecos_ELEGN.csv"
-    cond_df = fetch_csv(cond_url)
-    precos_df = fetch_csv(precos_url)
-    merged_df = pd.merge(cond_df, precos_df, on='COD_Proposta', how='inner')
-    filtered_df = merged_df[merged_df['Fornecimento'] == 'ELE']   
-    filtered_df = filtered_df[filtered_df['FiltroContratacao'].isin([100, 110, 111])]
-    filtered_df = filtered_df[filtered_df['Pot_Cont'] == '5,75']
-    column_map = {
-        # Precos_ELEGN
-        'COM': 'Comercializador',
-        'Pot_Cont': 'Potência contratada',
-        'Escalao': 'Escalão de consumo',
-        'ORD': 'Operador de rede',
-        'COD_Proposta': 'Código da oferta comercial',
-        'Contagem': 'Ciclo de contagem',
-        'TF': 'Termo fixo (€/dia)',
-        'TV': 'Termo de energia (€/kWh) - Simples',
-        'TVFV': 'Termo de energia (€/kWh) - Fora de Vazio',
-        'TVP': 'Termo de energia (€/kWh) - Ponta',
-        'TVV': 'Termo de energia (€/kWh) - Vazio',
-        'TVC': 'Termo de energia (€/kWh) - Cheias',
-        'TVVz': 'Termo de energia (€/kWh) - Vazio',
+async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.DataFrame:
+    cond_text, precos_text = await asyncio.gather(
+        _async_fetch_text(hass, COND_COMERCIAIS_URL),
+        _async_fetch_text(hass, PRECOS_ELEGN_URL),
+    )
 
-        # CondComerciais
-        'COM': 'Comercializador',
-        'CODProposta': 'Código da oferta comercial',
-        'NomeProposta': 'Nome da oferta comercial',
-        'TxTModalidade': 'Texto auxiliar',
-        'Segmento': 'Segmento da oferta comercial',
-        'TipoContagem': 'Ciclos de contagem com oferta - 1 = Simples | 2 = Bi-horária | 3 = Tri-horária | ex: 12 = Simples e Bi-horária; 123 = Simples, Bi-horária e Tri-horária',
-        'ConsIni_ELE': 'Limitações da oferta - Consumo inicial (Eletricidade)',
-        'ConsFim_ELE': 'Limitações da oferta - Consumo final (Eletricidade)',
-        'Fornecimento': 'Tipo de energia - Eletricidade | Gás Natural | Dual',
-        'DuracaoContrato': 'Duração do contrato (meses)',
-        'Data ini': 'Data de início da oferta comercial',
-        'Data fim': 'Data de fim da oferta comercial',
-        'FiltroContratacao': 'Modo de contratação - Eletrónica|Presencial|Telefónica. Ex: 110 = Eletrónica e Presencial; 100 = Eletrónica; 111 = Eletrónica, Presencial e telefónica',
-        'Filtrofaturacao': 'Modo de faturação - Eletrónica | Papel. Ex: 10 = Eletrónica; 01 = Papel; 11 = Eletrónica e Papel',
-        'FiltroPagamento': 'Modo de pagamento - Débito direto | Multibanco | Numerário/Payshop/CTT. Ex: 100 = Débito Direto; 101 = Débito direto e Numerário/Payshop/CTT',
-        'FiltroAtendimento': 'Modo de atendimento - Escrito | Presencial | Telefónico | Eletrónico. Ex: 1000 = Escrito; 1001 = Escrito e Eletrónico; 1101 = Escrito,  Presencial e Eletrónico',
-        'FiltroFidelização': 'Tem fidelização? (Sim/Não)',
-        'FiltroRenovavel': 'Tem origem 100% renovável? (Sim/Não)',
-        'FiltroRestrições': 'Tem restrições? (Sim/Não)',
-        'FiltroPrecosIndex': 'Tem preços indexados? (Sim/Não)',
-        'FiltroServicosAdic': 'Tem serviços adicionais obrigatórios? (Sim/Não)',
-        'FiltroTarifaSocial': 'Tem tarifa social? (Sim/Não)',
-        'FiltroReembolsos': 'Os desconto/reembolsos aplicam-se a Todos os Clientes da carteira? (Sim/Não)',
-        'FiltroNovosClientes': 'Os desconto/reembolsos aplicam-se exclusivamente a Novos Clientes da carteira? (Sim/Não)',
-        'CustoServicos_s/IVA (€/ano)': 'Custo dos serviços adicionais (sem IVA) em €/ano',
-        'CustoServicos_c/IVA (€/ano)': 'Custo dos serviços adicionais (com IVA) em €/ano',
-        'ReembFixo (€/ano)': 'Reembolsos/Descontos - Fixos em €/ano (aplicável a Todos os Clientes)',
-        'ReembTF_ELE (%)': 'Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Eletricidade (aplicável a Todos os Clientes)',
-        'ReembTW_ELE (%)': 'Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Eletricidade (aplicável a Todos os Clientes)',
-        'ReembW_ELE (€/kWh)': 'Reembolsos/Descontos sobre o termo de energia (€/kWh) - Eletricidade (aplicável a Todos os Clientes)',
-        'TxTOferta': 'Descritivo da oferta comercial',
-        'TxTERSE': 'Comentários da ERSE sobre a oferta comercial',
-        'LinkCOM': 'Link eletrónico para página do comercializador',
-        'LinkOfertaCom': 'Link eletrónico para a oferta comercial',
-        'LinkFichaPadrao': 'Link eletrónico para a ficha padronizada',
-        'LinkCondicoesGerais': 'Link eletrónico para as condições gerais do contrato',
-        'ContactoComercialTel': 'Contacto telefónico comercial',
-        'ContactoWEBouMAIL': 'Contacto de email',
-        'Contrat_Elect': 'Link eletrónico para contratação eletrónica',
-        'Contrat_Presen': 'Link eletrónico para contratação presencial',
-        'Contrat_Telef': 'Link eletrónico para contratação telefónica',
-        'TxTContratação': 'Descritivo no modo de contratação',
-        'TxTFatura': 'Descritivo no modo de faturação',
-        'TxTPagamento': 'Descritivo no modo de pagamento',
-        'TxTAtendimento': 'Descritivo no modo de atendimento',
-        'TxTFaturacao': 'Descritivo do tipo de faturação (mensal, conta certa…)',
-        'TxTFidelização': 'Descritivo das condições de fidelização',
-        'TxTRestricoesAdic': 'Descritivo das restrições adicionais da oferta comercial',
-        'Detalhe restrições': 'Detalhe das restrições adicionais da oferta comercial',
-        'DetalheOutrosDesc/ben': 'Detalhe dos descontos ou benefícios da oferta comercial',
-        'TxTAtualizaPrecos': 'Descritivo das condições de atualização dos preços da oferta comercial',
-        'TxTServicoAdic': 'Descritivo das condições dos serviços adicionais obrigatórios da oferta comercial',
-        'TxToutrosServicoAdic': 'Descritivo das condições de outros serviços adicionais não obrigatórios da oferta comercial',
-        'TxTReembolsos': 'Descritivo das condições de descontos/reembolsos da oferta comercial',
-        'DescontNovoCliente_c/IVA (€/ano)': 'Reembolsos/Descontos - Fixos em €/ano (aplicável a Novos Clientes)',
-        'Desc. TF_ELE (%) - Novo Cliente': 'Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Eletricidade  (aplicável a Novos Clientes)',
-        'Desc. TW_ELE (%) - Novo Cliente': 'Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Eletricidade  (aplicável a Novos Clientes)',
-        'Desc. W_ELE (€/kWh) - Novo Cliente': 'Reembolsos/Descontos sobre o termo de energia (€/kWh) - Eletricidade (aplicável a Novos Clientes)',
-        'TV4V': 'Tipo de energia (kWh)',
-    }
-    filtered_df = filtered_df.rename(columns=column_map)
-    filtered_df = filtered_df.drop(columns=['Escalão de consumo', 'Operador de rede', 'COM_y'])
-    gn_columns = [col for col in filtered_df.columns if 'Gás Natural' in col or 'GN' in col]
-    filtered_df = filtered_df.drop(columns=gn_columns)
-    if codigos_oferta is not None and len(codigos_oferta) > 0:
-        filtered_df = filtered_df[filtered_df['Código da oferta comercial'].isin(codigos_oferta)]
-    export_to_html(filtered_df)
-    return filtered_df
+    cond_df, precos_df = await asyncio.gather(
+        _async_read_csv(hass, cond_text),
+        _async_read_csv(hass, precos_text),
+    )
 
-"""""
-if __name__ == "__main__":
-    # Example usage: process all offers and export to HTML
-    df = process_csv()
-    print("Processed DataFrame:")
-    print(df.head())
-    # Optionally, process only specific offers:
-    # selected_codigos = ["12345", "67890"]
-    # df_filtered = process_csv(codigos_oferta=selected_codigos)
-    # print(df_filtered.head())
-"""""
+    # Basic sanity
+    if cond_df.empty:
+        return cond_df
+    if precos_df.empty:
+        # Return only cond if prices missing
+        merged = cond_df.copy()
+    else:
+        # Try common code columns
+        code_cols_cond = [c for c in ["COD_Proposta", "CODProposta", "Código da oferta comercial"] if c in cond_df.columns]
+        code_cols_prec = [c for c in ["COD_Proposta", "CODProposta", "Código da oferta comercial"] if c in precos_df.columns]
+        if not code_cols_cond or not code_cols_prec:
+            merged = cond_df
+        else:
+            merged = cond_df.merge(
+                precos_df,
+                left_on=code_cols_cond[0],
+                right_on=code_cols_prec[0],
+                how="left",
+                suffixes=("", "_preco")
+            )
+
+    # Optional: filter only electricity offers if column exists
+    for col in ["Fornecimento", "fornecimento"]:
+        if col in merged.columns:
+            merged = merged[merged[col].str.upper().fillna("") == "ELE"]
+            break
+
+    # Filter by selected offer codes
+    if codigos_oferta:
+        # Normalize selection
+        sel = {c.strip() for c in codigos_oferta if c.strip()}
+        code_col = next((c for c in ["Código da oferta comercial", "COD_Proposta", "CODProposta"] if c in merged.columns), None)
+        if code_col:
+            merged = merged[merged[code_col].isin(sel)]
+
+    # Do NOT drop columns: return everything so sensor picks all attributes
+    merged = merged.reset_index(drop=True)
+    return merged

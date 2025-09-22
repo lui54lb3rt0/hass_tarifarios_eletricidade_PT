@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 2.0.0 - 2025-09-22
+- Adicionado pipeline assíncrono (aiohttp + executor) para evitar bloqueio do loop.
+- Introduzido `async_process_csv` e remoção de chamadas síncronas `requests`.
+- Sensores por oferta agora expõem todas as colunas como atributos normalizados.
+- Estado dos sensores convertido para timestamp (device_class=timestamp).
+- Logging de debug para inspeção de colunas/linhas.
+- Manifest incrementado e adicionado iot_class/integration_type.
+
 ## [1.5.0] - 2025-09-17
 
 ### Fixed
@@ -50,3 +59,15 @@ All notable changes to this project will be documented in this file.
 - Creates a sensor entity for each offer (CODProposta)
 - Exposes all offer details as entity attributes
 - Enables tariff comparison and selection in Home Assistant
+
+## 0.1.2
+- Normalização de atributos (snake_case), remoção de acentos e símbolos.
+- Ajustes de criação de múltiplos sensores por oferta.
+- Filtro por potência contratada aplicado no sensor.
+
+## 0.1.1
+- Correção do encaminhamento de plataformas: uso de `async_forward_entry_setups`.
+- Implementação de `async_unload_entry`.
+
+## 0.1.0
+- Versão inicial: config flow, criação básica de sensores, download CSV síncrono.
