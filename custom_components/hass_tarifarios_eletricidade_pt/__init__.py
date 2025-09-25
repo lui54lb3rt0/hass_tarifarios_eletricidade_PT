@@ -19,6 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Extract configuration from config entry
     comercializador = entry.data.get("comercializador")
+    pot_cont = entry.data.get("pot_cont")
     sel_codes = entry.data.get("codigos_oferta")
     if isinstance(sel_codes, str):
         sel_codes = [c.strip() for c in sel_codes.split(",") if c.strip()]
@@ -27,7 +28,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = TarifariosDataUpdateCoordinator(
         hass, 
         comercializador=comercializador,
-        codigos_oferta=sel_codes
+        codigos_oferta=sel_codes,
+        pot_cont=pot_cont
     )
     
     # Fetch initial data

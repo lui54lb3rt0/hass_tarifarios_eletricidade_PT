@@ -193,7 +193,7 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
     _LOGGER.warning("%s empty/unparsable", label)
     return pd.DataFrame()
 
-async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None) -> pd.DataFrame:
+async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None, pot_cont=None) -> pd.DataFrame:
     try:
         cond_txt, precos_txt = await asyncio.gather(
             _async_fetch(hass, COND_COMERCIAIS_URL),
@@ -270,6 +270,37 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
         else:
             _LOGGER.warning("Comercializador column not found for comercializador filter.")
 
+    # Filter by power capacity (pot_cont)
+    if pot_cont:
+        # Look for power columns (both original and normalized)
+        pot_cols = ["Potência contratada", "Potência contratada__norm", "Pot_Cont", "Pot_Cont__norm"]
+        pot_col = next((c for c in pot_cols if c in merged.columns), None)
+        
+        if pot_col:
+            before = len(merged)
+            # Normalize both config value and data for comparison
+            pot_cont_normalized = str(pot_cont).replace(",", ".").strip()
+            
+            # Debug what we're looking for
+            available_values = sorted(merged[pot_col].dropna().unique().tolist())
+            _LOGGER.debug("Power filter looking for: '%s' (normalized: '%s')", pot_cont, pot_cont_normalized)
+            _LOGGER.debug("Available power values: %s", available_values)
+            
+            # Filter - handle both comma and dot formats in data
+            merged_filtered = merged[
+                merged[pot_col].astype(str).str.replace(",", ".").str.strip() == pot_cont_normalized
+            ]
+            
+            if not merged_filtered.empty:
+                merged = merged_filtered
+                _LOGGER.debug("Power filter '%s': %d -> %d rows", pot_cont, before, len(merged))
+            else:
+                _LOGGER.warning("Power filter '%s' removed all rows. Available: %s", 
+                              pot_cont, available_values)
+        else:
+            _LOGGER.warning("Power column not found for power filter. Available columns: %s", 
+                          list(merged.columns))
+
     merged = merged.reset_index(drop=True)
     _LOGGER.debug("Final DF rows=%d cols=%d", len(merged), len(merged.columns))
     return merged
@@ -278,10 +309,11 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
 class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Tarifarios data from GitHub."""
 
-    def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None):
+    def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None, pot_cont=None):
         """Initialize."""
         self.comercializador = comercializador
         self.codigos_oferta = codigos_oferta
+        self.pot_cont = pot_cont
         super().__init__(
             hass,
             _LOGGER,
@@ -294,16 +326,18 @@ class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            _LOGGER.debug("Fetching data from GitHub URLs for %s...", self.comercializador or "all")
+            _LOGGER.debug("Fetching data from GitHub URLs for %s (power: %s)...", 
+                        self.comercializador or "all", self.pot_cont or "all")
             data = await async_process_csv(
                 self.hass, 
                 codigos_oferta=self.codigos_oferta,
-                comercializador=self.comercializador
+                comercializador=self.comercializador,
+                pot_cont=self.pot_cont
             )
             if data is None or data.empty:
                 raise UpdateFailed("Failed to fetch data or data is empty")
-            _LOGGER.info("Successfully fetched %d records from GitHub for %s", 
-                        len(data), self.comercializador or "all")
+            _LOGGER.info("Successfully fetched %d records from GitHub for %s (power: %s)", 
+                        len(data), self.comercializador or "all", self.pot_cont or "all")
             return data
         except Exception as exception:
             _LOGGER.error("Error fetching data: %s", exception)
