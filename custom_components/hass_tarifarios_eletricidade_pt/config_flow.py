@@ -1,6 +1,7 @@
 import voluptuous as vol
 from homeassistant import config_entries
 from .const import DOMAIN
+from .data_loader import async_get_comercializadores
 
 COND_COMERCIAIS_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CCondComerciais.csv"
 PRECOS_ELEGN_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CPrecos_ELEGN.csv"
@@ -699,21 +700,70 @@ codigo_oferta_list = ["COD_Proposta",
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Tarifários Eletricidade PT."""
 
+    VERSION = 1
+
+    def __init__(self):
+        """Initialize config flow."""
+        self._comercializadores = []
+        self._selected_comercializador = None
+
     async def async_step_user(self, user_input=None):
-        schema = vol.Schema({
-            vol.Required("pot_cont", default=pot_cont_values[0]): vol.In(pot_cont_values),
-            vol.Optional("codigos_oferta", default=[]): vol.In(codigo_oferta_list)
-        })
-        # No need to ask for URLs, just proceed
+        """Handle the initial step - select comercializador."""
+        errors = {}
+        
+        if not self._comercializadores:
+            try:
+                self._comercializadores = await async_get_comercializadores(self.hass)
+                if not self._comercializadores:
+                    errors["base"] = "no_data"
+            except Exception:
+                errors["base"] = "cannot_connect"
+
         if user_input is not None:
+            self._selected_comercializador = user_input["comercializador"]
+            return await self.async_step_config()
+
+        if errors.get("base"):
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema({}),
+                errors=errors,
+            )
+
+        schema = vol.Schema({
+            vol.Required("comercializador"): vol.In(self._comercializadores),
+        })
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+        )
+
+    async def async_step_config(self, user_input=None):
+        """Handle the configuration step - select power and codes."""
+        if user_input is not None:
+            # Create unique entry ID based on comercializador and timestamp
+            unique_id = f"{self._selected_comercializador}_{int(self.hass.loop.time())}"
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_configured()
+
             return self.async_create_entry(
-                title="Tarifários Eletricidade PT",
+                title=self._selected_comercializador,
                 data={
+                    "comercializador": self._selected_comercializador,
                     "pot_cont": user_input.get("pot_cont"),
                     "codigos_oferta": user_input.get("codigos_oferta")
                 },
             )
+
+        schema = vol.Schema({
+            vol.Required("pot_cont", default=pot_cont_values[0]): vol.In(pot_cont_values),
+            vol.Optional("codigos_oferta", default=[]): vol.In(codigo_oferta_list)
+        })
+
         return self.async_show_form(
-            step_id="user",
+            step_id="config",
             data_schema=schema,
+            description_placeholders={"comercializador": self._selected_comercializador}
         )

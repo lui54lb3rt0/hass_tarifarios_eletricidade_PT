@@ -80,20 +80,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
 
     entities = []
+    comercializador = config.get("comercializador", "unknown")
+    
     for _, row in df.iterrows():
         codigo = str(row[code_col])
         display_name = (str(row[name_col]).strip() if name_col and row.get(name_col) else f"Tarifa {codigo}")
+        
+        # Include comercializador in display name for clarity
+        full_display_name = f"{comercializador} - {display_name}"
 
         raw = row.to_dict()
         attrs = {}
         for k, v in raw.items():
             attrs[_normalize(k)] = _clean(v)
         attrs["codigo_original"] = codigo
+        attrs["comercializador"] = comercializador
         attrs["last_refresh_iso"] = ts.isoformat()
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]
 
-        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, display_name, attrs, ts))
+        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts))
 
     async_add_entities(entities, True)
 

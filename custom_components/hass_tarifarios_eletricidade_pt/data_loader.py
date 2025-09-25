@@ -124,6 +124,30 @@ def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
     
     return df_mapped
 
+
+async def async_get_comercializadores(hass: HomeAssistant) -> list[str]:
+    """Get list of available comercializadores from the data."""
+    try:
+        df = await async_process_csv(hass, codigos_oferta=None)
+        if df.empty:
+            _LOGGER.warning("No data available to extract comercializadores")
+            return []
+        
+        # Look for the comercializador column (mapped name)
+        comercializador_col = "Comercializador"
+        if comercializador_col not in df.columns:
+            _LOGGER.warning("Comercializador column not found in data")
+            return []
+        
+        # Get unique comercializadores, sorted
+        comercializadores = sorted(df[comercializador_col].dropna().unique().tolist())
+        _LOGGER.debug("Found %d comercializadores: %s", len(comercializadores), comercializadores)
+        return comercializadores
+    
+    except Exception as e:
+        _LOGGER.error("Error extracting comercializadores: %s", e)
+        return []
+
 async def _async_fetch(hass: HomeAssistant, url: str) -> str:
     session = async_get_clientsession(hass)
     async with session.get(url, timeout=30) as resp:
@@ -145,7 +169,7 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
     _LOGGER.warning("%s empty/unparsable", label)
     return pd.DataFrame()
 
-async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.DataFrame:
+async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None) -> pd.DataFrame:
     try:
         cond_txt, precos_txt = await asyncio.gather(
             _async_fetch(hass, COND_COMERCIAIS_URL),
@@ -212,6 +236,16 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.Data
         else:
             _LOGGER.warning("Code column not found for codes filter.")
 
+    # Filter by comercializador
+    if comercializador:
+        comercializador_col = "Comercializador"
+        if comercializador_col in merged.columns:
+            before = len(merged)
+            merged = merged[merged[comercializador_col] == comercializador]
+            _LOGGER.debug("Comercializador filter '%s': %d -> %d", comercializador, before, len(merged))
+        else:
+            _LOGGER.warning("Comercializador column not found for comercializador filter.")
+
     merged = merged.reset_index(drop=True)
     _LOGGER.debug("Final DF rows=%d cols=%d", len(merged), len(merged.columns))
     return merged
@@ -220,14 +254,15 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.Data
 class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Tarifarios data from GitHub."""
 
-    def __init__(self, hass: HomeAssistant, codigos_oferta=None):
+    def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None):
         """Initialize."""
+        self.comercializador = comercializador
         self.codigos_oferta = codigos_oferta
         super().__init__(
             hass,
             _LOGGER,
             # Name of the data. For logging purposes.
-            name="Tarifarios Eletricidade PT",
+            name=f"Tarifarios {comercializador or 'Eletricidade PT'}",
             # Polling interval. Will only be polled if there are subscribers.
             update_interval=timedelta(hours=24),  # Update once per day
         )
@@ -235,11 +270,16 @@ class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            _LOGGER.debug("Fetching data from GitHub URLs...")
-            data = await async_process_csv(self.hass, codigos_oferta=self.codigos_oferta)
+            _LOGGER.debug("Fetching data from GitHub URLs for %s...", self.comercializador or "all")
+            data = await async_process_csv(
+                self.hass, 
+                codigos_oferta=self.codigos_oferta,
+                comercializador=self.comercializador
+            )
             if data is None or data.empty:
                 raise UpdateFailed("Failed to fetch data or data is empty")
-            _LOGGER.info("Successfully fetched %d records from GitHub", len(data))
+            _LOGGER.info("Successfully fetched %d records from GitHub for %s", 
+                        len(data), self.comercializador or "all")
             return data
         except Exception as exception:
             _LOGGER.error("Error fetching data: %s", exception)
