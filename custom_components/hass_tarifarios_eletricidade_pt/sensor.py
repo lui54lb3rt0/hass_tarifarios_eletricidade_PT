@@ -46,6 +46,7 @@ def _clean(v):
 def _norm_pot(val):
     if not val:
         return None
+    # Normalize to dot format for consistent comparison
     return str(val).replace(",", ".").strip()
 
 
@@ -70,15 +71,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     if pot_cont_cfg and pot_norm_col:
         before = len(df)
-        # Normalize the config value the same way as the data
+        # Normalize both the config value and data values to dot format for comparison
         pot_cont_normalized = str(pot_cont_cfg).replace(",", ".").strip()
-        df_filtered = df[df[pot_norm_col].astype(str) == pot_cont_normalized]
+        
+        # Debug: Show what we're looking for vs what's available
+        available_values = sorted(df[pot_norm_col].dropna().unique().tolist())
+        _LOGGER.debug("Looking for power: %s (original: %s)", pot_cont_normalized, pot_cont_cfg)
+        _LOGGER.debug("Available power values: %s", available_values)
+        
+        # Filter using normalized comparison
+        df_filtered = df[df[pot_norm_col].astype(str).str.strip() == pot_cont_normalized]
+        
         if not df_filtered.empty:
-            _LOGGER.debug("Pot filter %s (norm: %s): %d -> %d", pot_cont_cfg, pot_cont_normalized, before, len(df_filtered))
+            _LOGGER.debug("Power filter %s -> %s: %d -> %d rows", pot_cont_cfg, pot_cont_normalized, before, len(df_filtered))
             df = df_filtered
         else:
-            _LOGGER.warning("Pot filter removed all rows; keeping unfiltered. Available values: %s", 
-                          sorted(df[pot_norm_col].unique().tolist()))
+            _LOGGER.warning("Power filter removed all rows for '%s' (normalized: '%s'). Available: %s", 
+                          pot_cont_cfg, pot_cont_normalized, available_values)
 
     if not code_col:
         _LOGGER.error("Code column not found. Columns=%s", list(df.columns))
