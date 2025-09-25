@@ -104,7 +104,6 @@ logger:
 - ✅ Suporte para logotipo
 - 🔄 Auto-adição de novos códigos sem reload
 - 🔄 Métricas derivadas (melhor preço vs média)
-- 🔄 Suporte gás (opcional)
 
 ## Versioning
 
