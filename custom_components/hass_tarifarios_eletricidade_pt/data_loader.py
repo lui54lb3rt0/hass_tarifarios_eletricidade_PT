@@ -1,9 +1,11 @@
 import asyncio
 import logging
+from datetime import timedelta
 from io import StringIO
 import pandas as pd
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,8 +17,112 @@ CODE_COLS = ["Código da oferta comercial", "COD_Proposta", "CODProposta"]
 POT_COLS  = ["Potência contratada", "Pot_Cont"]
 FORNECIMENTO_COLS = ["Fornecimento", "fornecimento"]
 
+# Header mapping from codes to descriptive names
+HEADER_MAPPING = {
+    # Precos_ELEGN headers
+    "COM": "Comercializador",
+    "Pot_Cont": "Potência contratada",
+    "Escalao": "Escalão de consumo",
+    "ORD": "Operador de rede",
+    "COD_Proposta": "Código da oferta comercial",
+    "Contagem": "Ciclo de contagem",
+    "TF": "Termo fixo (€/dia)",
+    "TV|TVFV|TVP": "Termo de energia (€/kWh) - Simples | Fora de Vazio | Ponta",
+    "TVV|TVC": "Termo de energia (€/kWh) - Vazio | Cheias",
+    "TVVz": "Termo de energia (€/kWh) - Vazio",
+    "TFGN": "Termo fixo (€/dia) - Gás Natural",
+    "TVGN": "Termo de energia (€/kWh) - Gás Natural",
+    
+    # CondComerciais headers
+    "CODProposta": "Código da oferta comercial",
+    "NomeProposta": "Nome da oferta comercial",
+    "TxTModalidade": "Texto auxiliar",
+    "Segmento": "Segmento da oferta comercial",
+    "TipoContagem": "Ciclos de contagem com oferta - 1 = Simples | 2 = Bi-horária | 3 = Tri-horária | ex: 12 = Simples e Bi-horária; 123 = Simples, Bi-horária e Tri-horária",
+    "ConsIni_GN": "Limitações da oferta - Consumo inicial (Gás Natural)",
+    "ConsFim_GN": "Limitações da oferta - Consumo final (Gás Natural)",
+    "ConsIni_ELE": "Limitações da oferta - Consumo inicial (Eletricidade)",
+    "ConsFim_ELE": "Limitações da oferta - Consumo final (Eletricidade)",
+    "Fornecimento": "Tipo de energia - Eletricidade | Gás Natural | Dual",
+    "DuracaoContrato": "Duração do contrato (meses)",
+    "Data ini": "Data de início da oferta comercial",
+    "Data fim": "Data de fim da oferta comercial",
+    "FiltroContratacao": "Modo de contratação - Eletrónica|Presencial|Telefónica. Ex: 110 = Eletrónica e Presencial; 100 = Eletrónica; 111 = Eletrónica, Presencial e telefónica",
+    "Filtrofaturacao": "Modo de faturação - Eletrónica | Papel. Ex: 10 = Eletrónica; 01 = Papel; 11 = Eletrónica e Papel",
+    "FiltroPagamento": "Modo de pagamento - Débito direto | Multibanco | Numerário/Payshop/CTT. Ex: 100 = Débito Direto; 101 = Débito direto e Numerário/Payshop/CTT",
+    "FiltroAtendimento": "Modo de atendimento - Escrito | Presencial | Telefónico | Eletrónico. Ex: 1000 = Escrito; 1001 = Escrito e Eletrónico; 1101 = Escrito,  Presencial e Eletrónico",
+    "FiltroFidelização": "Tem fidelização? (Sim/Não)",
+    "FiltroRenovavel": "Tem origem 100% renovável? (Sim/Não)",
+    "FiltroRestrições": "Tem restrições? (Sim/Não)",
+    "FiltroPrecosIndex": "Tem preços indexados? (Sim/Não)",
+    "FiltroServicosAdic": "Tem serviços adicionais obrigatórios? (Sim/Não)",
+    "FiltroTarifaSocial": "Tem tarifa social? (Sim/Não)",
+    "FiltroReembolsos": "Os desconto/reembolsos aplicam-se a Todos os Clientes da carteira? (Sim/Não)",
+    "FiltroNovosClientes": "Os desconto/reembolsos aplicam-se exclusivamente a Novos Clientes da carteira? (Sim/Não)",
+    "CustoServicos_s/IVA (€/ano)": "Custo dos serviços adicionais (sem IVA) em €/ano",
+    "CustoServicos_c/IVA (€/ano)": "Custo dos serviços adicionais (com IVA) em €/ano",
+    "ReembFixo (€/ano)": "Reembolsos/Descontos - Fixos em €/ano (aplicável a Todos os Clientes)",
+    "ReembTF_ELE (%)": "Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Eletricidade (aplicável a Todos os Clientes)",
+    "ReembTW_ELE (%)": "Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Eletricidade (aplicável a Todos os Clientes)",
+    "ReembW_ELE (€/kWh)": "Reembolsos/Descontos sobre o termo de energia (€/kWh) - Eletricidade (aplicável a Todos os Clientes)",
+    "ReembTF_GN (%)": "Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Gás Natural (aplicável a Todos os Clientes)",
+    "ReembTW_GN (%)": "Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Gás Natural (aplicável a Todos os Clientes)",
+    "ReembW_GN (€/kWh)": "Reembolsos/Descontos sobre o termo de energia (€/kWh) - Gás Natural (aplicável a Todos os Clientes)",
+    "TxTOferta": "Descritivo da oferta comercial",
+    "TxTERSE": "Comentários da ERSE sobre a oferta comercial",
+    "LinkCOM": "Link eletrónico para página do comercializador",
+    "LinkOfertaCom": "Link eletrónico para a oferta comercial",
+    "LinkFichaPadrao": "Link eletrónico para a ficha padronizada",
+    "LinkCondicoesGerais": "Link eletrónico para as condições gerais do contrato",
+    "ContactoComercialTel": "Contacto telefónico comercial",
+    "ContactoWEBouMAIL": "Contacto de email",
+    "Contrat_Elect": "Link eletrónico para contratação eletrónica",
+    "Contrat_Presen": "Link eletrónico para contratação presencial",
+    "Contrat_Telef": "Link eletrónico para contratação telefónica",
+    "TxTContratação": "Descritivo no modo de contratação",
+    "TxTFatura": "Descritivo no modo de faturação",
+    "TxTPagamento": "Descritivo no modo de pagamento",
+    "TxTAtendimento": "Descritivo no modo de atendimento",
+    "TxTFaturacao": "Descritivo do tipo de faturação (mensal, conta certa…)",
+    "TxTFidelização": "Descritivo das condições de fidelização",
+    "TxTRestricoesAdic": "Descritivo das restrições adicionais da oferta comercial",
+    "Detalhe restrições": "Detalhe das restrições adicionais da oferta comercial",
+    "DetalheOutrosDesc/benefi": "Detalhe dos descontos ou benefícios da oferta comercial",
+    "TxTAtualizaPrecos": "Descritivo das condições de atualização dos preços da oferta comercial",
+    "TxTServicoAdic": "Descritivo das condições dos serviços adicionais obrigatórios da oferta comercial",
+    "TxToutrosServicoAdic": "Descritivo das condições de outros serviços adicionais não obrigatórios da oferta comercial",
+    "TxTReembolsos": "Descritivo das condições de descontos/reembolsos da oferta comercial",
+    "DescontNovoCliente_c/IVA (€/ano)": "Reembolsos/Descontos - Fixos em €/ano (aplicável a Novos Clientes)",
+    "Desc. TF_ELE (%) - Novo Cliente": "Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Eletricidade  (aplicável a Novos Clientes)",
+    "Desc. TW_ELE (%) - Novo Cliente": "Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Eletricidade  (aplicável a Novos Clientes)",
+    "Desc. W_ELE (€/kWh) - Novo Cliente": "Reembolsos/Descontos sobre o termo de energia (€/kWh) - Eletricidade (aplicável a Novos Clientes)",
+    "Desc. TF_GN (%) - Novo Cliente": "Reembolsos/Descontos percentuais sobre o Termo Fixo (%) - Gás Natural (aplicável a Novos Clientes)",
+    "Desc. TW_GN (%) - Novo Cliente": "Reembolsos/Descontos percentuais sobre o Termo de energia (%) - Gás Natural (aplicável a Novos Clientes)",
+    "Desc. W_GN (€/kWh) - Novo Cliente": "Reembolsos/Descontos sobre o termo de energia (€/kWh) - Gás Natural (aplicável a Novos Clientes)",
+}
+
 def _normalize_pot_val(s: pd.Series) -> pd.Series:
     return s.astype(str).str.replace(",", ".", regex=False).str.strip()
+
+def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply header mapping to convert code headers to descriptive names."""
+    if df.empty:
+        return df
+    
+    # Create a copy to avoid modifying the original
+    df_mapped = df.copy()
+    
+    # Apply mapping to column names
+    new_columns = []
+    for col in df_mapped.columns:
+        mapped_name = HEADER_MAPPING.get(col, col)
+        new_columns.append(mapped_name)
+    
+    df_mapped.columns = new_columns
+    _LOGGER.debug("Applied header mapping. Original: %s -> Mapped: %s", 
+                  list(df.columns), list(df_mapped.columns))
+    
+    return df_mapped
 
 async def _async_fetch(hass: HomeAssistant, url: str) -> str:
     session = async_get_clientsession(hass)
@@ -53,6 +159,10 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.Data
         _async_read(cond_txt, "CondComerciais"),
         _async_read(precos_txt, "Precos_ELEGN"),
     )
+
+    # Apply header mapping to convert code headers to descriptive names
+    cond_df = _apply_header_mapping(cond_df)
+    precos_df = _apply_header_mapping(precos_df)
 
     if cond_df.empty:
         _LOGGER.warning("CondComerciais DataFrame empty.")
@@ -105,3 +215,32 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None) -> pd.Data
     merged = merged.reset_index(drop=True)
     _LOGGER.debug("Final DF rows=%d cols=%d", len(merged), len(merged.columns))
     return merged
+
+
+class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching Tarifarios data from GitHub."""
+
+    def __init__(self, hass: HomeAssistant, codigos_oferta=None):
+        """Initialize."""
+        self.codigos_oferta = codigos_oferta
+        super().__init__(
+            hass,
+            _LOGGER,
+            # Name of the data. For logging purposes.
+            name="Tarifarios Eletricidade PT",
+            # Polling interval. Will only be polled if there are subscribers.
+            update_interval=timedelta(hours=24),  # Update once per day
+        )
+
+    async def _async_update_data(self):
+        """Update data via library."""
+        try:
+            _LOGGER.debug("Fetching data from GitHub URLs...")
+            data = await async_process_csv(self.hass, codigos_oferta=self.codigos_oferta)
+            if data is None or data.empty:
+                raise UpdateFailed("Failed to fetch data or data is empty")
+            _LOGGER.info("Successfully fetched %d records from GitHub", len(data))
+            return data
+        except Exception as exception:
+            _LOGGER.error("Error fetching data: %s", exception)
+            raise UpdateFailed(f"Error communicating with API: {exception}") from exception

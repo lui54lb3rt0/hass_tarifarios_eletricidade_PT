@@ -5,6 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 
 from .const import DOMAIN  # ensure DOMAIN = "hass_tarifarios_eletricidade_pt"
+from .data_loader import TarifariosDataUpdateCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -15,7 +16,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a config entry."""
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    
+    # Extract codigos_oferta from config entry
+    sel_codes = entry.data.get("codigos_oferta")
+    if isinstance(sel_codes, str):
+        sel_codes = [c.strip() for c in sel_codes.split(",") if c.strip()]
+    
+    # Create the data update coordinator
+    coordinator = TarifariosDataUpdateCoordinator(hass, codigos_oferta=sel_codes)
+    
+    # Fetch initial data
+    await coordinator.async_config_entry_first_refresh()
+    
+    # Store coordinator in hass.data
+    hass.data[DOMAIN][entry.entry_id] = {
+        "coordinator": coordinator,
+        "config": entry.data,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
