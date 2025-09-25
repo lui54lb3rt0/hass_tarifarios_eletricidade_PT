@@ -17,7 +17,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CODE_COL_CANDIDATES = ["Código da oferta comercial", "COD_Proposta", "CODProposta"]
-NAME_COL_CANDIDATES = ["NomeProposta", "Nome Proposta", "Nome"]
+NAME_COL_CANDIDATES = ["Nome da oferta comercial", "NomeProposta", "Nome Proposta", "Nome"]
 POT_COL_CANDIDATES  = ["Potência contratada__norm", "Pot_Cont__norm", "Potência contratada", "Pot_Cont"]
 
 
@@ -84,10 +84,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     
     for _, row in df.iterrows():
         codigo = str(row[code_col])
-        display_name = (str(row[name_col]).strip() if name_col and row.get(name_col) else f"Tarifa {codigo}")
         
-        # Include comercializador in display name for clarity
-        full_display_name = f"{comercializador} - {display_name}"
+        # Get the commercial offer name (Nome da oferta comercial)
+        offer_name = None
+        if name_col and row.get(name_col):
+            offer_name = str(row[name_col]).strip()
+        
+        # Create display name: Provider - Commercial Offer Name
+        if offer_name:
+            full_display_name = f"{comercializador} - {offer_name}"
+        else:
+            # Fallback if no offer name available
+            full_display_name = f"{comercializador} - Tarifa {codigo}"
 
         raw = row.to_dict()
         attrs = {}
@@ -95,6 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             attrs[_normalize(k)] = _clean(v)
         attrs["codigo_original"] = codigo
         attrs["comercializador"] = comercializador
+        attrs["nome_oferta_comercial"] = offer_name or f"Tarifa {codigo}"
         attrs["last_refresh_iso"] = ts.isoformat()
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]

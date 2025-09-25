@@ -10,10 +10,10 @@
       },
       "config": {
         "title": "Configure {comercializador}",
-        "description": "Configure power capacity and specific offer codes for {comercializador}.",
+        "description": "Configure power capacity and select specific offers for {comercializador}.",
         "data": {
           "pot_cont": "Contracted Power (kVA)",
-          "codigos_oferta": "Offer Codes (Optional)"
+          "codigos_oferta": "Available Offers (Select multiple if desired)"
         }
       }
     },

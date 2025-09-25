@@ -148,6 +148,30 @@ async def async_get_comercializadores(hass: HomeAssistant) -> list[str]:
         _LOGGER.error("Error extracting comercializadores: %s", e)
         return []
 
+
+async def async_get_offer_codes_for_comercializador(hass: HomeAssistant, comercializador: str) -> list[str]:
+    """Get list of offer codes available for a specific comercializador."""
+    try:
+        df = await async_process_csv(hass, comercializador=comercializador)
+        if df.empty:
+            _LOGGER.warning("No data available for comercializador %s", comercializador)
+            return []
+        
+        # Look for the offer code column (mapped name)
+        code_col = next((c for c in CODE_COLS if c in df.columns), None)
+        if not code_col:
+            _LOGGER.warning("Offer code column not found in data")
+            return []
+        
+        # Get unique offer codes, sorted
+        offer_codes = sorted(df[code_col].dropna().unique().tolist())
+        _LOGGER.debug("Found %d offer codes for %s: %s", len(offer_codes), comercializador, offer_codes)
+        return offer_codes
+    
+    except Exception as e:
+        _LOGGER.error("Error extracting offer codes for %s: %s", comercializador, e)
+        return []
+
 async def _async_fetch(hass: HomeAssistant, url: str) -> str:
     session = async_get_clientsession(hass)
     async with session.get(url, timeout=30) as resp:
