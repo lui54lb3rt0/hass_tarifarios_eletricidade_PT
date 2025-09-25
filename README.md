@@ -1,193 +1,115 @@
 # Tarifários Eletricidade PT (Home Assistant)
 
-Integração personalizada para Home Assistant que carrega e monitora tarifários de eletricidade portugueses em tempo real, organizados por comercializador e com atualizações automáticas diárias.
+Integração custom para carregar, filtrar e expor tarifários de eletricidade (Portugal) como sensores no Home Assistant.
 
-## ✨ Funcionalidades
+**Versão atual: 2.2.1**
 
-### 🏢 **Organização por Comercializador**
-- **Entradas por fornecedor**: Cada comercializador (EDPSU, ACCIONA, ALFAENERGIA, etc.) tem a sua própria entrada
-- **Múltiplas configurações**: Pode adicionar várias entradas para o mesmo comercializador com configurações diferentes
-- **Títulos claros**: Cada entrada mostra o nome do comercializador
+## Funcionalidades
 
-### 🔄 **Atualizações Automáticas**
-- **Atualização diária**: Dados são automaticamente atualizados uma vez por dia
-- **Fonte GitHub**: Carrega dados diretamente dos ficheiros CSV no repositório GitHub
-- **Sem reinicializações**: Sensores atualizam automaticamente sem necessidade de reiniciar
+- Download assíncrono (não bloqueante) de:
+  - CondComerciais.csv
+  - Precos_ELEGN.csv
+- Junção automática dos datasets
+- **Atualização automática diária às 11:00** (hora local do Home Assistant)
+- Filtro por:
+  - Potência contratada
+  - Lista de códigos de oferta (COD_Proposta)
+  - Apenas fornecimento ELE
+- Criação de sensores por oferta selecionada:
+  - Estado = timestamp da última atualização
+  - Nome = NomeProposta (do CSV) ou "Tarifa <código>"
+  - Todos os campos do CSV normalizados como atributos
+- Normalização de nomes de atributos (snake_case, remoção de acentos e símbolos)
+- Suporte a recarregamento sem perda de dados
 
-### 🎛️ **Configuração Inteligente**
-- **Seleção de Comercializador**: Primeiro escolhe o fornecedor de energia
-- **Códigos Dinâmicos**: Mostra apenas os códigos de oferta disponíveis para o comercializador selecionado
-- **Filtro por Potência**: Suporta todas as potências contratuais portuguesas (1,15 a 41,4 kVA)
+## Instalação
 
-### 📊 **Sensores Detalhados**
-- **Nomes Descritivos**: `Comercializador - Nome da Oferta Comercial`
-- **Valor Real**: Estado do sensor mostra o "Termo Fixo" diário em €/dia
-- **Atributos Completos**: Todos os dados tarifários disponíveis como atributos
+1. Copiar pasta `custom_components/hass_tarifarios_eletricidade_pt` para o diretório `config/custom_components` do Home Assistant.
+2. Confirmar ficheiros:
+   - `__init__.py`
+   - `manifest.json` (versão 2.2.1)
+   - `const.py`
+   - `config_flow.py`
+   - `sensor.py`
+   - `data_loader.py`
+   - `logo.png` (opcional)
+3. Reiniciar Home Assistant.
+4. Adicionar via: Definições → Dispositivos e Serviços → Adicionar Integração → "Tarifários Eletricidade PT".
 
-## 🚀 Instalação
+## Configuração (UI)
 
-### Via HACS (Recomendado)
-1. Abrir HACS no Home Assistant
-2. Ir para "Integrações"
-3. Clicar nos três pontos → "Repositórios personalizados"
-4. Adicionar: `https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT`
-5. Categoria: "Integration"
-6. Instalar e reiniciar o Home Assistant
+Campos obrigatórios:
+- **Potência contratada** (ex: `5.75` ou `5,75`)
+- **Lista de códigos de oferta** (um ou vários, separados por vírgula)
 
-### Manual
-1. Descarregar e extrair para: `config/custom_components/hass_tarifarios_eletricidade_pt/`
-2. Reiniciar Home Assistant
-3. Adicionar via UI: **Definições** → **Integrações** → **Adicionar Integração**
+Após configurar:
+- Sensores por oferta: Nome baseado em `NomeProposta`
+- Atualização automática: Todos os dias às 11:00
 
-## ⚙️ Configuração
+## Atributos dos Sensores de Oferta
 
-### Passo 1: Escolher Comercializador
-Selecione o fornecedor de energia que pretende monitorizar:
-- EDPSU (EDP Comercial)
-- ACCIONA
-- ALFAENERGIA
-- AUDAX
-- AXPO
-- E muitos outros...
+Incluem todas as colunas do DataFrame (normalizadas):
+- `codigo_original` - Código da oferta
+- `nomeproposta` - Nome da proposta
+- `potencia_norm` - Potência normalizada (vírgula → ponto)
+- `last_refresh_iso` - Timestamp da última atualização
+- Demais campos CSV: termos fixos, energia, condições, links, etc.
 
-### Passo 2: Configurar Parâmetros
-- **Potência Contratada**: Escolha a sua potência (formato português: 1,15, 2,3, 3,45, etc.)
-- **Códigos de Oferta**: (Opcional) Selecione ofertas específicas ou deixe vazio para todas
+## Estado dos Sensores
 
-## 📈 Sensores Criados
+O estado de cada sensor é o timestamp (UTC ISO8601) da última atualização de dados.
 
-### Formato dos Nomes
-```
-EDPSU - Tarifa Regulada Eletricidade
-ACCIONA - Energia Verde Plus
-ALFAENERGIA - Oferta Competitiva Casa
-```
+## Atualização Automática
 
-### Estado do Sensor
-- **Valor**: Termo fixo diário em euros (ex: 0.085)
-- **Unidade**: €/day
-- **Ícone**: 💶
+- **Frequência**: Diária às 11:00 (hora local do Home Assistant)
+- **Processo**: Download dos CSVs → filtros → atualização dos sensores existentes
+- **Novos códigos**: Necessário recarregar integração para adicionar
 
-### Atributos Disponíveis
+## Utilização em Templates
+
 ```yaml
-comercializador: "EDPSU"
-nome_oferta_comercial: "Tarifa Regulada Eletricidade"
-codigo_original: "TUR"
-termo_fixo_eur_dia: 0.085
-potencia_norm: "3.45"
-termo_de_energia_kwh_simples_fora_de_vazio_ponta: 0.1658
-# ... todos os outros campos tarifários
-last_refresh_iso: "2025-09-25T10:30:00Z"
+# Estado (timestamp)
+{{ states('sensor.tarifa_eniplenitude_01') }}
+
+# Atributo específico
+{{ state_attr('sensor.tarifa_eniplenitude_01', 'nomeproposta') }}
+{{ state_attr('sensor.tarifa_eniplenitude_01', 'pot_cont') }}
+
+# Todos os atributos
+{{ states.sensor.tarifa_eniplenitude_01.attributes }}
 ```
 
-## 🔍 Funcionalidades Avançadas
+## Resolução de Problemas
 
-### Headers Inteligentes
-- Converte códigos técnicos em nomes descritivos
-- `COM` → `Comercializador`
-- `TF` → `Termo fixo (€/dia)`
-- `POT_CONT` → `Potência contratada`
+| Problema | Causa provável | Ação |
+|----------|----------------|------|
+| Poucos atributos | DataFrame filtrado demais | Ativar debug |
+| Aviso blocking I/O | Versão antiga | Atualizar para 2.2.1 |
+| Sem sensores | Filtro pot_cont incorreto | Verificar formato (vírgula vs ponto) |
+| Não atualiza | Hora incorreta | Confirmar timezone do HA |
 
-### Filtragem Precisa
-- **Por Comercializador**: Dados apenas do fornecedor selecionado
-- **Por Potência**: Filtragem exata da potência contratual
-- **Por Códigos**: Ofertas específicas se desejado
+### Debug
 
-### Coordenação de Dados
-- Sistema robusto de atualização com retry automático
-- Gestão centralizada de dados por comercializador
-- Log detalhado para debugging
-
-## 🛠️ Resolução de Problemas
-
-### Logs de Debug
-Adicione ao `configuration.yaml`:
 ```yaml
+# configuration.yaml
 logger:
   default: warning
   logs:
     custom_components.hass_tarifarios_eletricidade_pt: debug
 ```
 
-### Problemas Comuns
+## Roadmap
 
-| Problema | Solução |
-|----------|---------|
-| Não aparecem ofertas para potência selecionada | Verificar se a potência existe para esse comercializador |
-| Dados não atualizam | Verificar logs - pode ser problema de conectividade |
-| Sensores com nomes estranhos | Normal - usa nomes oficiais das ofertas comerciais |
+- ✅ Atualizações periódicas automáticas
+- ✅ Suporte para logotipo
+- 🔄 Auto-adição de novos códigos sem reload
+- 🔄 Métricas derivadas (melhor preço vs média)
+- 🔄 Suporte gás (opcional)
 
-### Verificação de Estado
-Os logs mostram:
-- Quantos registos foram carregados
-- Filtros aplicados
-- Valores de potência disponíveis
-- Códigos de oferta encontrados
+## Versioning
 
-## 📊 Exemplos de Uso
+Esta integração segue [Semantic Versioning](https://semver.org/). 
 
-### Automação - Alertar Melhor Tarifa
-```yaml
-automation:
-  - alias: "Alerta Melhor Tarifa"
-    trigger:
-      - platform: time
-        at: "09:00:00"
-    action:
-      - service: notify.mobile_app
-        data:
-          message: >
-            Melhor tarifa hoje: 
-            {{ states.sensor | selectattr('entity_id', 'match', 'sensor.*edpsu.*') 
-               | sort(attribute='state') | first }}
-```
+## Licença
 
-### Template Sensor - Comparação
-```yaml
-template:
-  - sensor:
-      - name: "Tarifa Mais Barata"
-        state: >
-          {{ states.sensor | selectattr('attributes.comercializador', 'defined')
-             | sort(attribute='state') | first | attr('state') }}
-        unit_of_measurement: "€/day"
-```
-
-## 🔮 Roadmap
-
-- ✅ **Atualizações Diárias**: Implementado
-- ✅ **Organização por Comercializador**: Implementado  
-- ✅ **Filtros Inteligentes**: Implementado
-- ✅ **Headers Descritivos**: Implementado
-- 🔄 **Notificações de Mudanças de Preço**: Em desenvolvimento
-- 🔄 **Comparação Automática**: Em desenvolvimento
-- 🔄 **Histórico de Preços**: Planeado
-
-## 📝 Changelog
-
-### v2.0.0 (2025-09-25)
-- ✨ **Nova arquitetura**: Organização por comercializador
-- ✨ **Atualizações automáticas**: Coordenador com updates diários
-- ✨ **Configuração inteligente**: Códigos dinâmicos por comercializador
-- ✨ **Headers descritivos**: Mapeamento automático de nomes técnicos
-- ✨ **Filtros precisos**: Potência exata em formato português
-- ✨ **Sensores melhorados**: Estado mostra termo fixo em €/dia
-- 🐛 **Filtro de potência**: Corrigido problema de filtragem
-- 🐛 **Nomes de entidades**: Formato "Comercializador - Oferta"
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Por favor:
-1. Fork do repositório
-2. Criar branch para a funcionalidade
-3. Commit das alterações
-4. Push para a branch
-5. Criar Pull Request
-
-## 📄 Licença
-
-Este projeto está licenciado sob a MIT License - ver ficheiro [LICENSE](LICENSE) para detalhes.
-
----
-
-**💡 Dica**: Esta integração é perfeita para quem quer monitorizar e comparar tarifas de eletricidade portuguesas automaticamente no Home Assistant!
+Ver `LICENSE`.

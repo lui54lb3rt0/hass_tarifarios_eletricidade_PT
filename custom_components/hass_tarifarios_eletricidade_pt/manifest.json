@@ -1,12 +1,12 @@
 {
   "domain": "hass_tarifarios_eletricidade_pt",
   "name": "Tarifários Eletricidade PT",
-  "version": "2.0.1",
-  "documentation": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/blob/main/README.md",
+  "version": "2.2.1",
   "requirements": ["pandas>=2.0.0"],
-  "dependencies": [],
   "codeowners": ["@lui54lb3rt0"],
   "config_flow": true,
   "integration_type": "hub",
-  "iot_class": "cloud_polling"
+  "iot_class": "cloud_polling",
+  "documentation": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT",
+  "issue_tracker": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/issues"
 }
