@@ -4,14 +4,10 @@ from datetime import timedelta
 from io import StringIO
 import pandas as pd
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from .downloader import async_download_and_extract_csvs
 
 _LOGGER = logging.getLogger(__name__)
-
-# Correct forward-slash raw URLs (no %5C)
-COND_COMERCIAIS_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/CondComerciais.csv"
-PRECOS_ELEGN_URL    = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/Precos_ELEGN.csv"
 
 CODE_COLS = ["Código da oferta comercial", "COD_Proposta", "CODProposta"]
 POT_COLS  = ["Potência contratada", "Pot_Cont"]
@@ -172,14 +168,6 @@ async def async_get_offer_codes_for_comercializador(hass: HomeAssistant, comerci
         _LOGGER.error("Error extracting offer codes for %s: %s", comercializador, e)
         return []
 
-async def _async_fetch(hass: HomeAssistant, url: str) -> str:
-    session = async_get_clientsession(hass)
-    async with session.get(url, timeout=30) as resp:
-        txt = await resp.text()
-        _LOGGER.debug("Fetched %s status=%s size=%d", url, resp.status, len(txt))
-        resp.raise_for_status()
-        return txt
-
 async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
     # Try ; then ,
     for sep in (";", ","):
@@ -195,10 +183,9 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
 
 async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None, pot_cont=None) -> pd.DataFrame:
     try:
-        cond_txt, precos_txt = await asyncio.gather(
-            _async_fetch(hass, COND_COMERCIAIS_URL),
-            _async_fetch(hass, PRECOS_ELEGN_URL),
-        )
+        # Replace GitHub URLs with new downloader
+        _LOGGER.debug("Downloading and extracting CSV files from ERSE...")
+        cond_txt, precos_txt = await async_download_and_extract_csvs(hass)
     except Exception as e:
         _LOGGER.error("Download failure: %s", e)
         return pd.DataFrame()
@@ -307,7 +294,7 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
 
 
 class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching Tarifarios data from GitHub."""
+    """Class to manage fetching Tarifarios data from ERSE."""
 
     def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None, pot_cont=None):
         """Initialize."""
@@ -326,7 +313,7 @@ class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            _LOGGER.debug("Fetching data from GitHub URLs for %s (power: %s)...", 
+            _LOGGER.debug("Fetching data from ERSE for %s (power: %s)...", 
                         self.comercializador or "all", self.pot_cont or "all")
             data = await async_process_csv(
                 self.hass, 
@@ -336,7 +323,7 @@ class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
             )
             if data is None or data.empty:
                 raise UpdateFailed("Failed to fetch data or data is empty")
-            _LOGGER.info("Successfully fetched %d records from GitHub for %s (power: %s)", 
+            _LOGGER.info("Successfully fetched %d records from ERSE for %s (power: %s)", 
                         len(data), self.comercializador or "all", self.pot_cont or "all")
             return data
         except Exception as exception:

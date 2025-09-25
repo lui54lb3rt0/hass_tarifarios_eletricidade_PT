@@ -1,7 +1,7 @@
 {
   "domain": "hass_tarifarios_eletricidade_pt",
   "name": "Tarifários Eletricidade PT",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "requirements": ["pandas>=2.0.0"],
   "codeowners": ["@lui54lb3rt0"],
   "config_flow": true,
