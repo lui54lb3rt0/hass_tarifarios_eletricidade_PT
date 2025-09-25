@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 CODE_COL_CANDIDATES = ["Código da oferta comercial", "COD_Proposta", "CODProposta"]
 NAME_COL_CANDIDATES = ["Nome da oferta comercial", "NomeProposta", "Nome Proposta", "Nome"]
 POT_COL_CANDIDATES  = ["Potência contratada__norm", "Pot_Cont__norm", "Potência contratada", "Pot_Cont"]
+TERMO_FIXO_CANDIDATES = ["Termo fixo (€/dia)", "TF"]
 
 
 def _normalize(k: str) -> str:
@@ -65,15 +66,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     code_col = next((c for c in CODE_COL_CANDIDATES if c in df.columns), None)
     name_col = next((c for c in NAME_COL_CANDIDATES if c in df.columns), None)
     pot_norm_col = next((c for c in POT_COL_CANDIDATES if c in df.columns), None)
+    termo_fixo_col = next((c for c in TERMO_FIXO_CANDIDATES if c in df.columns), None)
 
     if pot_cont_cfg and pot_norm_col:
         before = len(df)
-        df_filtered = df[df[pot_norm_col].astype(str) == pot_cont_cfg]
+        # Normalize the config value the same way as the data
+        pot_cont_normalized = str(pot_cont_cfg).replace(",", ".").strip()
+        df_filtered = df[df[pot_norm_col].astype(str) == pot_cont_normalized]
         if not df_filtered.empty:
-            _LOGGER.debug("Pot filter %s: %d -> %d", pot_cont_cfg, before, len(df_filtered))
+            _LOGGER.debug("Pot filter %s (norm: %s): %d -> %d", pot_cont_cfg, pot_cont_normalized, before, len(df_filtered))
             df = df_filtered
         else:
-            _LOGGER.warning("Pot filter removed all rows; keeping unfiltered.")
+            _LOGGER.warning("Pot filter removed all rows; keeping unfiltered. Available values: %s", 
+                          sorted(df[pot_norm_col].unique().tolist()))
 
     if not code_col:
         _LOGGER.error("Code column not found. Columns=%s", list(df.columns))
@@ -97,6 +102,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             # Fallback if no offer name available
             full_display_name = f"{comercializador} - Tarifa {codigo}"
 
+        # Get the termo fixo value for this row
+        termo_fixo_value = None
+        if termo_fixo_col and row.get(termo_fixo_col):
+            try:
+                termo_fixo_value = float(str(row[termo_fixo_col]).replace(",", "."))
+            except (ValueError, TypeError):
+                termo_fixo_value = None
+
         raw = row.to_dict()
         attrs = {}
         for k, v in raw.items():
@@ -104,21 +117,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         attrs["codigo_original"] = codigo
         attrs["comercializador"] = comercializador
         attrs["nome_oferta_comercial"] = offer_name or f"Tarifa {codigo}"
+        attrs["termo_fixo_eur_dia"] = termo_fixo_value
         attrs["last_refresh_iso"] = ts.isoformat()
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]
 
-        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts))
+        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts, termo_fixo_value))
 
     async_add_entities(entities, True)
 
 
 class OfferSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Tarifarios offer sensor."""
-    _attr_icon = "mdi:flash"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:currency-eur"
+    _attr_device_class = None  # No device class for price values
+    _attr_unit_of_measurement = "€/day"
 
-    def __init__(self, coordinator, entry_id: str, codigo: str, name: str, attrs: dict, ts: datetime):
+    def __init__(self, coordinator, entry_id: str, codigo: str, name: str, attrs: dict, ts: datetime, termo_fixo_value: float = None):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_name = name
@@ -126,13 +141,31 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         self._codigo = codigo
         self._attrs = attrs
         self._ts = ts
+        self._termo_fixo_value = termo_fixo_value
 
     @property
     def native_value(self):
-        """Return the timestamp of the last update."""
-        if self.coordinator.last_update_success:
-            return datetime.now(timezone.utc)
-        return self._ts
+        """Return the daily fixed term value in euros."""
+        if self.coordinator.last_update_success and self.coordinator.data is not None and not self.coordinator.data.empty:
+            # Try to get fresh termo fixo value from coordinator data
+            try:
+                code_col = next((c for c in CODE_COL_CANDIDATES if c in self.coordinator.data.columns), None)
+                termo_fixo_col = next((c for c in TERMO_FIXO_CANDIDATES if c in self.coordinator.data.columns), None)
+                
+                if code_col and termo_fixo_col:
+                    matching_rows = self.coordinator.data[self.coordinator.data[code_col].astype(str) == self._codigo]
+                    if not matching_rows.empty:
+                        row = matching_rows.iloc[0]
+                        if row.get(termo_fixo_col):
+                            try:
+                                return float(str(row[termo_fixo_col]).replace(",", "."))
+                            except (ValueError, TypeError):
+                                pass
+            except Exception as e:
+                _LOGGER.debug("Error getting fresh termo fixo for %s: %s", self._codigo, e)
+        
+        # Fallback to stored value
+        return self._termo_fixo_value
 
     @property
     def extra_state_attributes(self):

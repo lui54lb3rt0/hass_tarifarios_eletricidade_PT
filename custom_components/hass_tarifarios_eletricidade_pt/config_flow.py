@@ -10,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 COND_COMERCIAIS_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CCondComerciais.csv"
 PRECOS_ELEGN_URL = "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/refs/heads/main/data/csv%5CPrecos_ELEGN.csv"
 
-pot_cont_values = ["3.45", "4.6", "5.75", "6.9", "10.35"]  # Replace with actual values
+pot_cont_values = ["1.15", "2.3", "3.45", "4.6", "5.75", "6.9", "10.35", "13.8", "17.25", "20.7", "27.6", "34.5", "41.4"]  # Common power values in Portugal
 codigo_oferta_list = ["COD_Proposta",
                     "TUR",
                     "CUR",
