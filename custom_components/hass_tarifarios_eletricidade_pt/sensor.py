@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,6 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         attrs["comercializador"] = comercializador
         attrs["nome_oferta_comercial"] = offer_name or f"Tarifa {codigo}"
         attrs["termo_fixo_eur_dia"] = termo_fixo_value
+        attrs["integration_version"] = VERSION
         attrs["last_refresh_iso"] = ts.isoformat()
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]
@@ -178,6 +179,7 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
                         for k, v in row.to_dict().items():
                             fresh_attrs[_normalize(k)] = _clean(v)
                         fresh_attrs["codigo_original"] = self._codigo
+                        fresh_attrs["integration_version"] = VERSION
                         fresh_attrs["last_refresh_iso"] = datetime.now(timezone.utc).isoformat()
                         return fresh_attrs
             except Exception as e:

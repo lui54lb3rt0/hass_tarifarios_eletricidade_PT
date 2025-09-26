@@ -6,6 +6,7 @@ import pandas as pd
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .downloader import async_download_and_extract_csvs
+from .const import VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
