@@ -25,9 +25,9 @@ TERMO_FIXO_CANDIDATES = ["Termo fixo (€/dia)", "TF"]
 def _normalize(k: str) -> str:
     k2 = unicodedata.normalize("NFKD", k).encode("ascii", "ignore").decode()
     k2 = k2.lower()
-    for old, new in (("€", "eur"), ("%", "pct"), ("/", "_"), ("-", "_")):
+    for old, new in (("€", "eur"), ("%", "pct"), ("/", "_"), ("-", "_"), ("|", "_"), (":", "_")):
         k2 = k2.replace(old, new)
-    for ch in "()[]":
+    for ch in "()[]{}":
         k2 = k2.replace(ch, "")
     while "  " in k2:
         k2 = k2.replace("  ", " ")
