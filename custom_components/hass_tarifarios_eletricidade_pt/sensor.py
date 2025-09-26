@@ -101,7 +101,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         raw = row.to_dict()
         attrs = {}
         for k, v in raw.items():
-            attrs[_normalize(k)] = _clean(v)
+            normalized_key = _normalize(k)
+            cleaned_value = _clean(v)
+            attrs[normalized_key] = cleaned_value
+            # Debug specific columns
+            if "vazio" in normalized_key.lower() and ("cheias" in normalized_key.lower() or normalized_key.lower().endswith("vazio")):
+                _LOGGER.debug("Attribute mapping: '%s' -> '%s' = %s", k, normalized_key, cleaned_value)
+        
         attrs["codigo_original"] = codigo
         attrs["comercializador"] = comercializador
         attrs["nome_oferta_comercial"] = offer_name or f"Tarifa {codigo}"

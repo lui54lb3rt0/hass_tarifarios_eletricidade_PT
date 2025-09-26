@@ -118,6 +118,18 @@ def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
     _LOGGER.debug("Applied header mapping. Original: %s -> Mapped: %s", 
                   list(df.columns), list(df_mapped.columns))
     
+    # Debug: Show if specific columns exist after mapping
+    target_columns = [
+        "Termo de energia (€/kWh) - Vazio | Cheias",
+        "Termo de energia (€/kWh) - Vazio"
+    ]
+    for col in target_columns:
+        if col in df_mapped.columns:
+            sample_values = df_mapped[col].dropna().head(3).tolist()
+            _LOGGER.debug("Column '%s' exists with sample values: %s", col, sample_values)
+        else:
+            _LOGGER.warning("Column '%s' NOT FOUND after header mapping", col)
+    
     return df_mapped
 
 
