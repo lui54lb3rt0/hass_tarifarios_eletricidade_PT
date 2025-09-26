@@ -200,11 +200,7 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
         try:
             df = await asyncio.to_thread(pd.read_csv, StringIO(csv_text), sep=sep, dtype=str, na_filter=True)
             if len(df.columns) > 1:
-                _LOGGER.info("%s parsed sep='%s' rows=%d cols=%s", label, sep, len(df), list(df.columns))
-                # Additional debug: show first few lines of CSV for inspection
-                if label == "Precos_ELEGN":
-                    first_lines = csv_text.split('\n')[:5]  # Show more lines
-                    _LOGGER.info("%s first 5 lines: %s", label, first_lines)
+                _LOGGER.error("%s COLUMNS: %s", label, list(df.columns))
                 return df
         except Exception as e:
             _LOGGER.debug("%s parse fail sep='%s': %s", label, sep, e)
@@ -219,6 +215,13 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
     except Exception as e:
         _LOGGER.error("Download failure: %s", e)
         return pd.DataFrame()
+
+    # Debug: Show first few lines of the raw CSV
+    _LOGGER.error("=== PRECOS_ELEGN CSV DEBUG INFO ===")
+    first_lines = precos_txt.split('\n')[:10]
+    for i, line in enumerate(first_lines):
+        _LOGGER.error("Line %d: %s", i+1, line)
+    _LOGGER.error("=== END DEBUG INFO ===")
 
     cond_df, precos_df = await asyncio.gather(
         _async_read(cond_txt, "CondComerciais"),
