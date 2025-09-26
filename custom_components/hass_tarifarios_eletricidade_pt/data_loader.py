@@ -212,21 +212,52 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
         # Replace GitHub URLs with new downloader
         _LOGGER.debug("Downloading and extracting CSV files from ERSE...")
         cond_txt, precos_txt = await async_download_and_extract_csvs(hass)
+        
+        # Debug: Show first few lines of the raw CSV
+        _LOGGER.error("=== PRECOS_ELEGN CSV DEBUG INFO ===")
+        first_lines = precos_txt.split('\n')[:10]
+        for i, line in enumerate(first_lines):
+            _LOGGER.error("Line %d: %s", i+1, line)
+        _LOGGER.error("=== END DEBUG INFO ===")
+        
     except Exception as e:
         _LOGGER.error("Download failure: %s", e)
         return pd.DataFrame()
-
-    # Debug: Show first few lines of the raw CSV
-    _LOGGER.error("=== PRECOS_ELEGN CSV DEBUG INFO ===")
-    first_lines = precos_txt.split('\n')[:10]
-    for i, line in enumerate(first_lines):
-        _LOGGER.error("Line %d: %s", i+1, line)
-    _LOGGER.error("=== END DEBUG INFO ===")
 
     cond_df, precos_df = await asyncio.gather(
         _async_read(cond_txt, "CondComerciais"),
         _async_read(precos_txt, "Precos_ELEGN"),
     )
+    
+    # Check if the expected columns are missing and try fallback to static files
+    expected_cols = ["TVV|TVC", "TVVz", "TFGN", "TVGN"]
+    missing_cols = [col for col in expected_cols if col not in precos_df.columns]
+    
+    if missing_cols and not precos_df.empty:
+        _LOGGER.error("Missing expected columns: %s. Downloaded CSV has different format!", missing_cols)
+        _LOGGER.error("Downloaded CSV columns: %s", list(precos_df.columns))
+        
+        # Try to use static files as fallback
+        try:
+            import os
+            static_precos_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "Precos_ELEGN.csv")
+            static_cond_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "CondComerciais.csv")
+            
+            if os.path.exists(static_precos_path):
+                _LOGGER.warning("Using static CSV files as fallback due to format mismatch")
+                with open(static_precos_path, 'r', encoding='utf-8-sig') as f:
+                    static_precos_txt = f.read()
+                with open(static_cond_path, 'r', encoding='utf-8-sig') as f:
+                    static_cond_txt = f.read()
+                
+                cond_df, precos_df = await asyncio.gather(
+                    _async_read(static_cond_txt, "CondComerciais_Static"),
+                    _async_read(static_precos_txt, "Precos_ELEGN_Static"),
+                )
+                _LOGGER.info("Successfully loaded static CSV files as fallback")
+            
+        except Exception as fallback_error:
+            _LOGGER.error("Fallback to static files failed: %s", fallback_error)
 
     # Apply header mapping to convert code headers to descriptive names
     cond_df = _apply_header_mapping(cond_df)
