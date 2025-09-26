@@ -110,15 +110,15 @@ def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
     df_mapped = df.copy()
     
     # Debug: Show original columns before mapping
-    _LOGGER.debug("Original columns before mapping: %s", list(df.columns))
+    _LOGGER.info("Original columns before mapping: %s", list(df.columns))
     
     # Check for the specific columns we're looking for
     expected_cols = ["TVV|TVC", "TVVz", "TFGN", "TVGN"]
     for col in expected_cols:
         if col in df.columns:
-            _LOGGER.debug("Found expected column '%s'", col)
+            _LOGGER.info("Found expected column '%s'", col)
         else:
-            _LOGGER.warning("Expected column '%s' NOT FOUND in original data", col)
+            _LOGGER.error("Expected column '%s' NOT FOUND in original data", col)
     
     # Apply mapping to column names
     new_columns = []
@@ -126,7 +126,7 @@ def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
         mapped_name = HEADER_MAPPING.get(col, col)
         new_columns.append(mapped_name)
         if col in expected_cols:
-            _LOGGER.debug("Mapping: '%s' -> '%s'", col, mapped_name)
+            _LOGGER.info("Mapping: '%s' -> '%s'", col, mapped_name)
     
     df_mapped.columns = new_columns
     _LOGGER.debug("Applied header mapping. Original: %s -> Mapped: %s", 
@@ -200,11 +200,11 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
         try:
             df = await asyncio.to_thread(pd.read_csv, StringIO(csv_text), sep=sep, dtype=str, na_filter=True)
             if len(df.columns) > 1:
-                _LOGGER.debug("%s parsed sep='%s' rows=%d cols=%s", label, sep, len(df), list(df.columns))
+                _LOGGER.info("%s parsed sep='%s' rows=%d cols=%s", label, sep, len(df), list(df.columns))
                 # Additional debug: show first few lines of CSV for inspection
                 if label == "Precos_ELEGN":
-                    first_lines = csv_text.split('\n')[:3]
-                    _LOGGER.debug("%s first 3 lines: %s", label, first_lines)
+                    first_lines = csv_text.split('\n')[:5]  # Show more lines
+                    _LOGGER.info("%s first 5 lines: %s", label, first_lines)
                 return df
         except Exception as e:
             _LOGGER.debug("%s parse fail sep='%s': %s", label, sep, e)
