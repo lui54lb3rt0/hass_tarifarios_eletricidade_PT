@@ -260,9 +260,27 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
             _LOGGER.error("Fallback to static files failed: %s", fallback_error)
 
     # Apply header mapping to convert code headers to descriptive names
-    cond_df = _apply_header_mapping(cond_df)
     precos_df = _apply_header_mapping(precos_df)
-
+    cond_df = _apply_header_mapping(cond_df)
+    
+    # Check if specific columns exist after mapping
+    expected_mapped_columns = [
+        'Termo de energia (€/kWh) - Vazio | Cheias',
+        'Termo de energia (€/kWh) - Vazio',
+        'Termo fixo (€/dia) - Gás Natural',
+        'Termo de energia (€/kWh) - Gás Natural'
+    ]
+    
+    for col in expected_mapped_columns:
+        if col in precos_df.columns:
+            _LOGGER.info(f"Column '{col}' FOUND after header mapping")
+            # Show sample non-null values
+            sample_values = precos_df[col].dropna().head(3).tolist()
+            if sample_values:
+                _LOGGER.info(f"Sample values for '{col}': {sample_values}")
+        else:
+            _LOGGER.warning(f"Column '{col}' NOT FOUND after header mapping")
+    
     if cond_df.empty:
         _LOGGER.warning("CondComerciais DataFrame empty.")
         return cond_df
