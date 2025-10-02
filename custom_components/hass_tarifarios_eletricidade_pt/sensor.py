@@ -136,10 +136,11 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         # Create a more unique ID using multiple distinguishing factors
         import hashlib
         
-        # Get additional distinguishing factors from attributes
-        pot_cont = attrs.get("potencia_contratada", attrs.get("pot_cont", ""))
-        ciclo_contagem = attrs.get("ciclo_de_contagem", attrs.get("contagem", ""))
-        escalao = attrs.get("escalao_de_consumo", attrs.get("escalao", ""))
+        # Get additional distinguishing factors from attributes using normalized keys
+        pot_cont = attrs.get("potencia_contratada", "")
+        ciclo_contagem = attrs.get("ciclo_de_contagem", "")
+        escalao = attrs.get("escalao_de_consumo", "")
+        operador_rede = attrs.get("operador_de_rede", "")
         
         # Create a comprehensive unique identifier
         unique_parts = [
@@ -147,7 +148,8 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
             codigo,
             str(pot_cont).replace(",", ".").replace(" ", ""),
             str(ciclo_contagem).replace(" ", ""),
-            str(escalao).replace(" ", "")
+            str(escalao).replace(" ", ""),
+            str(operador_rede).replace(" ", "")
         ]
         
         if offer_name:
@@ -158,6 +160,10 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         unique_hash = hashlib.md5(unique_string.encode()).hexdigest()[:16]
         
         self._attr_unique_id = f"{entry_id}_{codigo}_{unique_hash}"
+        
+        # Debug log for troubleshooting
+        _LOGGER.debug("Creating sensor unique_id: parts=%s -> hash=%s -> final=%s", 
+                     unique_parts, unique_hash, self._attr_unique_id)
             
         self._codigo = codigo
         self._attrs = attrs
