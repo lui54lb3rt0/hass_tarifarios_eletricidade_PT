@@ -75,8 +75,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entities = []
     comercializador = config.get("comercializador", "unknown")
     
+    # Group by offer code to avoid creating multiple entities for the same offer
+    # (which can happen when there are multiple billing cycles)
+    grouped_offers = {}
+    
     for _, row in df.iterrows():
         codigo = str(row[code_col])
+        
+        # Skip if we already processed this offer code
+        if codigo in grouped_offers:
+            # Merge billing cycle data into existing offer
+            existing_attrs = grouped_offers[codigo]['attrs']
+            
+            # Add billing cycle specific data
+            ciclo_col = "Ciclo de contagem"
+            if ciclo_col in row and row[ciclo_col]:
+                ciclo = str(row[ciclo_col]).strip()
+                # Add cycle-specific pricing data
+                for k, v in row.to_dict().items():
+                    if any(price_term in k for price_term in ["Termo de energia", "TV", "TF"]):
+                        normalized_key = _normalize(f"{k}_{ciclo}")
+                        existing_attrs[normalized_key] = _clean(v)
+            continue
         
         # Get the commercial offer name (Nome da oferta comercial)
         offer_name = None
@@ -90,7 +110,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             # Fallback if no offer name available
             full_display_name = f"{comercializador} - Tarifa {codigo}"
 
-        # Get the termo fixo value for this row
+        # Get the termo fixo value for this row (prefer the first encountered)
         termo_fixo_value = None
         if termo_fixo_col and row.get(termo_fixo_col):
             try:
@@ -117,7 +137,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]
 
-        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts, termo_fixo_value, offer_name))
+        # Store the offer data
+        grouped_offers[codigo] = {
+            'display_name': full_display_name,
+            'attrs': attrs,
+            'termo_fixo_value': termo_fixo_value,
+            'offer_name': offer_name
+        }
+    
+    # Create entities from grouped offers
+    for codigo, offer_data in grouped_offers.items():
+        entities.append(OfferSensor(
+            coordinator, 
+            entry.entry_id, 
+            codigo, 
+            offer_data['display_name'], 
+            offer_data['attrs'], 
+            ts, 
+            offer_data['termo_fixo_value'], 
+            offer_data['offer_name']
+        ))
 
     async_add_entities(entities, True)
 
@@ -133,45 +172,12 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._attr_name = name
         
-        # Create a more unique ID using multiple distinguishing factors
-        import hashlib
-        
-        # Get additional distinguishing factors from attributes using normalized keys
-        # Try multiple possible attribute names for each factor
-        pot_cont = (attrs.get("potencia_contratada") or 
-                   attrs.get("pot_cont") or "")
-        
-        ciclo_contagem = (attrs.get("ciclo_de_contagem") or 
-                         attrs.get("contagem") or "")
-        
-        escalao = (attrs.get("escalao_de_consumo") or 
-                  attrs.get("escalao") or "")
-        
-        operador_rede = (attrs.get("operador_de_rede") or 
-                        attrs.get("ord") or "")
-        
-        # Create a comprehensive unique identifier
-        unique_parts = [
-            entry_id,
-            codigo,
-            str(pot_cont).replace(",", ".").replace(" ", ""),
-            str(ciclo_contagem).replace(" ", ""),
-            str(escalao).replace(" ", ""),
-            str(operador_rede).replace(" ", "")
-        ]
-        
-        if offer_name:
-            unique_parts.append(offer_name)
-        
-        # Create hash of all parts to ensure uniqueness while keeping length reasonable
-        unique_string = "_".join(str(part) for part in unique_parts if part)
-        unique_hash = hashlib.md5(unique_string.encode()).hexdigest()[:16]
-        
-        self._attr_unique_id = f"{entry_id}_{codigo}_{unique_hash}"
+        # Simplified unique ID based on offer code only
+        # since we now group by offer and don't create separate entities for billing cycles
+        self._attr_unique_id = f"{entry_id}_{codigo}"
         
         # Debug log for troubleshooting
-        _LOGGER.debug("Creating sensor unique_id: pot_cont=%s, ciclo=%s, escalao=%s, operador=%s, offer=%s -> parts=%s -> hash=%s -> final=%s", 
-                     pot_cont, ciclo_contagem, escalao, operador_rede, offer_name, unique_parts, unique_hash, self._attr_unique_id)
+        _LOGGER.debug("Creating sensor unique_id for offer %s: %s", codigo, self._attr_unique_id)
             
         self._codigo = codigo
         self._attrs = attrs
@@ -183,6 +189,7 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         """Return the daily fixed term value in euros."""
         if self.coordinator.last_update_success and self.coordinator.data is not None and not self.coordinator.data.empty:
             # Try to get fresh termo fixo value from coordinator data
+            # Use the first matching row (since we group by offer code)
             try:
                 code_col = next((c for c in CODE_COL_CANDIDATES if c in self.coordinator.data.columns), None)
                 termo_fixo_col = next((c for c in TERMO_FIXO_CANDIDATES if c in self.coordinator.data.columns), None)
@@ -190,7 +197,7 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
                 if code_col and termo_fixo_col:
                     matching_rows = self.coordinator.data[self.coordinator.data[code_col].astype(str) == self._codigo]
                     if not matching_rows.empty:
-                        row = matching_rows.iloc[0]
+                        row = matching_rows.iloc[0]  # Take first row for this offer
                         if row.get(termo_fixo_col):
                             try:
                                 return float(str(row[termo_fixo_col]).replace(",", "."))
@@ -204,23 +211,44 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes."""
+        """Return the state attributes with data from all billing cycles."""
         # Update attributes with fresh data from coordinator if available
         if self.coordinator.data is not None and not self.coordinator.data.empty:
             try:
-                # Find the row for this codigo in the fresh data
+                # Find all rows for this codigo in the fresh data
                 code_col = next((c for c in CODE_COL_CANDIDATES if c in self.coordinator.data.columns), None)
                 if code_col:
                     matching_rows = self.coordinator.data[self.coordinator.data[code_col].astype(str) == self._codigo]
                     if not matching_rows.empty:
-                        # Update attributes with fresh data
-                        row = matching_rows.iloc[0]
+                        # Merge data from all rows (billing cycles) for this offer
                         fresh_attrs = {}
-                        for k, v in row.to_dict().items():
+                        
+                        # Start with the first row as base
+                        base_row = matching_rows.iloc[0]
+                        for k, v in base_row.to_dict().items():
                             fresh_attrs[_normalize(k)] = _clean(v)
+                        
+                        # Add cycle-specific data from other rows
+                        ciclo_col = "Ciclo de contagem"
+                        for _, row in matching_rows.iterrows():
+                            if ciclo_col in row and row[ciclo_col]:
+                                ciclo = str(row[ciclo_col]).strip()
+                                # Add cycle-specific pricing data with cycle suffix
+                                for k, v in row.to_dict().items():
+                                    if any(price_term in k for price_term in ["Termo de energia", "TV"]):
+                                        normalized_key = _normalize(f"{k}_{ciclo}")
+                                        fresh_attrs[normalized_key] = _clean(v)
+                        
                         fresh_attrs["codigo_original"] = self._codigo
                         fresh_attrs["integration_version"] = VERSION
                         fresh_attrs["last_refresh_iso"] = datetime.now(timezone.utc).isoformat()
+                        
+                        # Add summary of available billing cycles
+                        available_cycles = [str(row[ciclo_col]).strip() for _, row in matching_rows.iterrows() 
+                                          if ciclo_col in row and row[ciclo_col]]
+                        if available_cycles:
+                            fresh_attrs["ciclos_disponiveis"] = ", ".join(sorted(set(available_cycles)))
+                        
                         return fresh_attrs
             except Exception as e:
                 _LOGGER.debug("Error updating attributes for %s: %s", self._codigo, e)
