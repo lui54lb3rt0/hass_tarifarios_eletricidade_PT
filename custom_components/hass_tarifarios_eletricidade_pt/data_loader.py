@@ -6,7 +6,6 @@ import pandas as pd
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .downloader import async_download_and_extract_csvs
-from .const import VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,40 +108,15 @@ def _apply_header_mapping(df: pd.DataFrame) -> pd.DataFrame:
     # Create a copy to avoid modifying the original
     df_mapped = df.copy()
     
-    # Debug: Show original columns before mapping
-    _LOGGER.info("Original columns before mapping: %s", list(df.columns))
-    
-    # Check for the specific columns we're looking for
-    expected_cols = ["TVV|TVC", "TVVz", "TFGN", "TVGN"]
-    for col in expected_cols:
-        if col in df.columns:
-            _LOGGER.info("Found expected column '%s'", col)
-        else:
-            _LOGGER.error("Expected column '%s' NOT FOUND in original data", col)
-    
     # Apply mapping to column names
     new_columns = []
     for col in df_mapped.columns:
         mapped_name = HEADER_MAPPING.get(col, col)
         new_columns.append(mapped_name)
-        if col in expected_cols:
-            _LOGGER.info("Mapping: '%s' -> '%s'", col, mapped_name)
     
     df_mapped.columns = new_columns
     _LOGGER.debug("Applied header mapping. Original: %s -> Mapped: %s", 
                   list(df.columns), list(df_mapped.columns))
-    
-    # Debug: Show if specific columns exist after mapping
-    target_columns = [
-        "Termo de energia (€/kWh) - Vazio | Cheias",
-        "Termo de energia (€/kWh) - Vazio"
-    ]
-    for col in target_columns:
-        if col in df_mapped.columns:
-            sample_values = df_mapped[col].dropna().head(3).tolist()
-            _LOGGER.debug("Column '%s' exists with sample values: %s", col, sample_values)
-        else:
-            _LOGGER.warning("Column '%s' NOT FOUND after header mapping", col)
     
     return df_mapped
 
@@ -200,7 +174,7 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
         try:
             df = await asyncio.to_thread(pd.read_csv, StringIO(csv_text), sep=sep, dtype=str, na_filter=True)
             if len(df.columns) > 1:
-                _LOGGER.error("%s COLUMNS: %s", label, list(df.columns))
+                _LOGGER.debug("%s parsed sep='%s' rows=%d cols=%s", label, sep, len(df), list(df.columns))
                 return df
         except Exception as e:
             _LOGGER.debug("%s parse fail sep='%s': %s", label, sep, e)
@@ -209,17 +183,9 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
 
 async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None, pot_cont=None) -> pd.DataFrame:
     try:
-        # Replace GitHub URLs with new downloader
+        # Use new downloader instead of GitHub URLs
         _LOGGER.debug("Downloading and extracting CSV files from ERSE...")
         cond_txt, precos_txt = await async_download_and_extract_csvs(hass)
-        
-        # Debug: Show first few lines of the raw CSV
-        _LOGGER.error("=== PRECOS_ELEGN CSV DEBUG INFO ===")
-        first_lines = precos_txt.split('\n')[:10]
-        for i, line in enumerate(first_lines):
-            _LOGGER.error("Line %d: %s", i+1, line)
-        _LOGGER.error("=== END DEBUG INFO ===")
-        
     except Exception as e:
         _LOGGER.error("Download failure: %s", e)
         return pd.DataFrame()
@@ -228,59 +194,11 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
         _async_read(cond_txt, "CondComerciais"),
         _async_read(precos_txt, "Precos_ELEGN"),
     )
-    
-    # Check if the expected columns are missing and try fallback to static files
-    expected_cols = ["TVV|TVC", "TVVz", "TFGN", "TVGN"]
-    missing_cols = [col for col in expected_cols if col not in precos_df.columns]
-    
-    if missing_cols and not precos_df.empty:
-        _LOGGER.error("Missing expected columns: %s. Downloaded CSV has different format!", missing_cols)
-        _LOGGER.error("Downloaded CSV columns: %s", list(precos_df.columns))
-        
-        # Try to use static files as fallback
-        try:
-            import os
-            static_precos_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "Precos_ELEGN.csv")
-            static_cond_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "CondComerciais.csv")
-            
-            if os.path.exists(static_precos_path):
-                _LOGGER.warning("Using static CSV files as fallback due to format mismatch")
-                with open(static_precos_path, 'r', encoding='utf-8-sig') as f:
-                    static_precos_txt = f.read()
-                with open(static_cond_path, 'r', encoding='utf-8-sig') as f:
-                    static_cond_txt = f.read()
-                
-                cond_df, precos_df = await asyncio.gather(
-                    _async_read(static_cond_txt, "CondComerciais_Static"),
-                    _async_read(static_precos_txt, "Precos_ELEGN_Static"),
-                )
-                _LOGGER.info("Successfully loaded static CSV files as fallback")
-            
-        except Exception as fallback_error:
-            _LOGGER.error("Fallback to static files failed: %s", fallback_error)
 
     # Apply header mapping to convert code headers to descriptive names
-    precos_df = _apply_header_mapping(precos_df)
     cond_df = _apply_header_mapping(cond_df)
-    
-    # Check if specific columns exist after mapping
-    expected_mapped_columns = [
-        'Termo de energia (€/kWh) - Vazio | Cheias',
-        'Termo de energia (€/kWh) - Vazio',
-        'Termo fixo (€/dia) - Gás Natural',
-        'Termo de energia (€/kWh) - Gás Natural'
-    ]
-    
-    for col in expected_mapped_columns:
-        if col in precos_df.columns:
-            _LOGGER.info(f"Column '{col}' FOUND after header mapping")
-            # Show sample non-null values
-            sample_values = precos_df[col].dropna().head(3).tolist()
-            if sample_values:
-                _LOGGER.info(f"Sample values for '{col}': {sample_values}")
-        else:
-            _LOGGER.warning(f"Column '{col}' NOT FOUND after header mapping")
-    
+    precos_df = _apply_header_mapping(precos_df)
+
     if cond_df.empty:
         _LOGGER.warning("CondComerciais DataFrame empty.")
         return cond_df
