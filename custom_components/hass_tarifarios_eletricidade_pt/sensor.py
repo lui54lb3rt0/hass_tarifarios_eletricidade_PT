@@ -188,26 +188,7 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
         # Fallback to stored attributes
         return self._attrs
 
+    @property
     def unique_id(self) -> str:
         """Return a unique ID for the sensor."""
-        # Include more factors to ensure uniqueness
-        comercializador = self._comercializador or "unknown"
-        nome_oferta = self._data.get(self._name_col, "unknown") if self._name_col and self._name_col in self._data else "unknown"
-        codigo = self._data.get("COD_Proposta", self._data.get("Código da oferta comercial", "unknown"))
-        pot_cont = self._data.get("Pot_Cont", self._data.get("Potência contratada", "unknown"))
-        contagem = self._data.get("Contagem", self._data.get("Ciclo de contagem", "unknown"))
-        
-        # Create a more unique identifier including timestamp to avoid conflicts
-        import time
-        timestamp = str(int(time.time()))[-6:]  # Last 6 digits of timestamp
-        
-        unique_parts = [
-            self._entry_id,
-            comercializador.replace(" ", "_"),
-            str(codigo).replace(" ", "_"),
-            str(pot_cont).replace(",", "_"),
-            str(contagem),
-            timestamp
-        ]
-        
-        return "_".join(str(part) for part in unique_parts if part != "unknown")[:100]  # Limit length
+        return self._attr_unique_id
