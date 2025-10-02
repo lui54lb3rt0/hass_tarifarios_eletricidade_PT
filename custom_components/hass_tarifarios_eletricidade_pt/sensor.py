@@ -117,7 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if pot_norm_col and pot_norm_col in row:
             attrs["potencia_norm"] = row[pot_norm_col]
 
-        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts, termo_fixo_value))
+        entities.append(OfferSensor(coordinator, entry.entry_id, codigo, full_display_name, attrs, ts, termo_fixo_value, offer_name))
 
     async_add_entities(entities, True)
 
@@ -128,11 +128,21 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
     _attr_device_class = None  # No device class for price values
     _attr_unit_of_measurement = "€/day"
 
-    def __init__(self, coordinator, entry_id: str, codigo: str, name: str, attrs: dict, ts: datetime, termo_fixo_value: float = None):
+    def __init__(self, coordinator, entry_id: str, codigo: str, name: str, attrs: dict, ts: datetime, termo_fixo_value: float = None, offer_name: str = None):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_name = name
-        self._attr_unique_id = f"{entry_id}_{codigo}"
+        
+        # Create a more unique ID using offer name and codigo
+        # Use a hash of the offer name to keep ID length reasonable
+        import hashlib
+        if offer_name:
+            # Create a short hash of the offer name for uniqueness
+            offer_hash = hashlib.md5(offer_name.encode()).hexdigest()[:8]
+            self._attr_unique_id = f"{entry_id}_{codigo}_{offer_hash}"
+        else:
+            self._attr_unique_id = f"{entry_id}_{codigo}"
+            
         self._codigo = codigo
         self._attrs = attrs
         self._ts = ts
