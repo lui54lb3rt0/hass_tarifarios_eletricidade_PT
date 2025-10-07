@@ -8,7 +8,5 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "documentation": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT",
-  "issue_tracker": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/issues",
-  "logo": "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/main/custom_components/hass_tarifarios_eletricidade_pt/logo.png",
-  "icon": "https://raw.githubusercontent.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/main/custom_components/hass_tarifarios_eletricidade_pt/icon.png"
+  "issue_tracker": "https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT/issues"
 }
