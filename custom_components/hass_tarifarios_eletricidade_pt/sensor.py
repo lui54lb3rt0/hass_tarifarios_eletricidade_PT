@@ -38,9 +38,36 @@ def _normalize(k: str) -> str:
 
 
 def _clean(v):
+    """Clean and normalize values, returning appropriate defaults for empty/unknown values."""
+    if v is None:
+        return None
     if isinstance(v, float) and math.isnan(v):
         return None
+    if isinstance(v, str):
+        # Strip whitespace and check for empty or "unknown" values
+        cleaned = v.strip()
+        if not cleaned or cleaned.lower() in ('nan', 'na', 'n/a', 'unknown', 'null', 'none', ''):
+            return None
+        return cleaned
     return v
+
+
+def _clean_for_display(v, field_name=None):
+    """Clean values for display, providing better defaults than 'Unknown'."""
+    cleaned = _clean(v)
+    if cleaned is None:
+        # Provide contextual defaults based on field type
+        if field_name and any(term in field_name.lower() for term in ['url', 'link', 'contacto', 'email']):
+            return ''  # Empty string for contact fields
+        elif field_name and any(term in field_name.lower() for term in ['data', 'date']):
+            return ''  # Empty string for dates
+        elif field_name and any(term in field_name.lower() for term in ['custo', 'preco', 'price', 'cost']):
+            return '0'  # Zero for monetary fields that might be optional
+        elif field_name and any(term in field_name.lower() for term in ['escalao', 'operador', 'rede']):
+            return 'N/A'  # More appropriate for technical fields
+        else:
+            return None  # Let Home Assistant handle as Unknown
+    return cleaned
 
 
 def _norm_pot(val):
@@ -95,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 for k, v in row.to_dict().items():
                     if any(price_term in k for price_term in ["Termo de energia", "TV", "TF"]):
                         normalized_key = _normalize(f"{k}_{ciclo}")
-                        existing_attrs[normalized_key] = _clean(v)
+                        existing_attrs[normalized_key] = _clean_for_display(v, k)
             continue
         
         # Get the commercial offer name (Nome da oferta comercial)
@@ -122,7 +149,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         attrs = {}
         for k, v in raw.items():
             normalized_key = _normalize(k)
-            cleaned_value = _clean(v)
+            cleaned_value = _clean_for_display(v, k)
             attrs[normalized_key] = cleaned_value
             # Debug specific columns
             if "vazio" in normalized_key.lower() and ("cheias" in normalized_key.lower() or normalized_key.lower().endswith("vazio")):
@@ -226,7 +253,8 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
                         # Start with the first row as base
                         base_row = matching_rows.iloc[0]
                         for k, v in base_row.to_dict().items():
-                            fresh_attrs[_normalize(k)] = _clean(v)
+                            normalized_key = _normalize(k)
+                            fresh_attrs[normalized_key] = _clean_for_display(v, k)
                         
                         # Add cycle-specific data from other rows
                         ciclo_col = "Ciclo de contagem"
@@ -237,7 +265,7 @@ class OfferSensor(CoordinatorEntity, SensorEntity):
                                 for k, v in row.to_dict().items():
                                     if any(price_term in k for price_term in ["Termo de energia", "TV"]):
                                         normalized_key = _normalize(f"{k}_{ciclo}")
-                                        fresh_attrs[normalized_key] = _clean(v)
+                                        fresh_attrs[normalized_key] = _clean_for_display(v, k)
                         
                         fresh_attrs["codigo_original"] = self._codigo
                         fresh_attrs["integration_version"] = VERSION

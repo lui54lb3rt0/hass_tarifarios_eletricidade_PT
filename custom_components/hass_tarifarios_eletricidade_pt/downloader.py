@@ -246,11 +246,17 @@ async def async_get_latest_csv_url(hass: HomeAssistant) -> str:
         # Optional: Save HTML for debugging (only in debug mode)
         if _LOGGER.isEnabledFor(logging.DEBUG):
             try:
-                with open('/tmp/erse_page.html', 'w', encoding='utf-8') as f:
-                    f.write(html_content)
+                # Use asyncio to avoid blocking the event loop
+                import asyncio
+                def write_debug_file():
+                    with open('/tmp/erse_page.html', 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+                
+                # Run in thread pool to avoid blocking
+                await asyncio.get_event_loop().run_in_executor(None, write_debug_file)
                 _LOGGER.debug("Saved HTML content to /tmp/erse_page.html for debugging")
-            except:
-                pass  # Ignore if we can't save
+            except Exception as e:
+                _LOGGER.debug("Could not save HTML debug file: %s", e)
         
         # Strategy 1: Analyze page content for CSV URLs
         _LOGGER.debug("Analyzing page content for CSV URLs...")
