@@ -2,95 +2,168 @@
 
 All notable changes to this project will be documented in this file.
 
-## 2.3.1 - 2025-10-07
-### Fixed
-- Fixed blocking I/O operation in downloader debug mode
-- Improved data cleaning to handle empty/NaN values better
-- Replace 'Unknown' values with more appropriate defaults (N/A, empty string, etc.)
-- Better handling of optional fields like Escalão and Operador de rede
-- Fixed multiple entities per tariff by grouping by offer code
-- Enhanced unique ID generation for sensors
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Added
-- Context-aware display formatting for different field types
-- Enhanced HTML search for CSV URLs with multiple discovery strategies
-- BeautifulSoup4 requirement for better HTML parsing
-- Proper version management from manifest.json
-- Integration logo and icon for Home Assistant UI
-- Version update script for easier releases
+## [2.4.0] - 2025-10-07
 
-### Changed
-- Simplified unique ID generation (one entity per offer)
-- Merge billing cycle data into single entity attributes
-- Improved logging and error handling
-- Dynamic version loading from manifest.json
+### 🚀 Major Features
+- **Comprehensive README revamp**: Professional documentation with badges, detailed installation guides, and extensive examples
+- **Enhanced troubleshooting**: Complete FAQ section with common problems and solutions
+- **Advanced template examples**: Ready-to-use YAML snippets for tariff comparison and automation
+- **Project roadmap**: Clear feature timeline and contribution guidelines
 
-## 2.2.1 - 2025-09-22
-- Adicionado suporte para logotipo da integração.
-- Melhorias na documentação.
+### ✨ Enhancements
+- **Professional branding**: Integration now shows logo and proper versioning in Home Assistant UI
+- **Image optimization**: Logo and icon files optimized for Home Assistant brands repository submission
+- **Documentation structure**: Comprehensive sections covering installation, configuration, usage, and troubleshooting
+- **Template gallery**: Advanced examples for price comparison, automation triggers, and notifications
 
-## 2.2.0 - 2025-09-22
-- Implementado refresh automático diário às 11:00 (hora local).
-- Adicionado sistema de agendamento para atualização automática dos dados.
-- Sensores atualizam automaticamente com dados frescos do CSV remoto.
-- Melhorada gestão de memória e cleanup de callbacks.
+### 🔧 Technical Improvements
+- **Manifest.json optimization**: Removed invalid logo/icon URLs as per Home Assistant standards
+- **Version consistency**: Dynamic version loading from manifest.json for accurate display
+- **Brands repository preparation**: Created submission scripts and guides for official logo display
+- **Code organization**: Better separation of concerns and improved maintainability
 
-## 2.0.1 - 2025-09-22
-- Corrigido erro de device_class=timestamp (agora usa datetime nativo em vez de string).
+### 📚 Documentation
+- **Installation methods**: Both HACS and manual installation with detailed steps
+- **Configuration examples**: Complete setup scenarios with real-world use cases
+- **API reference**: Comprehensive attribute documentation and template usage
+- **Troubleshooting guide**: Solutions for common issues with diagnostic tools
+- **Contributing guidelines**: Clear instructions for community contributions
 
-## 2.0.0 - 2025-09-22
-- Adicionado pipeline assíncrono (aiohttp + executor) para evitar bloqueio do loop.
-- Introduzido `async_process_csv` e remoção de chamadas síncronas `requests`.
-- Sensores por oferta agora expõem todas as colunas como atributos normalizados.
-- Estado dos sensores convertido para timestamp (device_class=timestamp).
-- Logging de debug para inspeção de colunas/linhas.
-- Manifest incrementado e adicionado iot_class/integration_type.
+### 🐛 Bug Fixes
+- **Manifest format**: Corrected logo/icon handling according to Home Assistant specifications
+- **Version display**: Fixed version showing as commit ID instead of semantic version
+- **Documentation links**: Updated all references to current repository structure
+
+### 📦 Assets
+- **Logo optimization**: 256x225 interlaced PNG for professional appearance
+- **Icon standardization**: 256x256 interlaced PNG meeting Home Assistant requirements
+- **Submission scripts**: Automated tools for Home Assistant brands repository submission
+
+## [2.3.3] - 2025-10-07
+
+### 🔧 Technical Updates
+- **Image processing**: Added ImageMagick optimization for logo and icon files
+- **Git management**: Enhanced version control with proper tagging system
+- **Submission preparation**: Created tools for Home Assistant brands repository submission
+
+## [2.3.2] - 2025-10-07
+
+### 🖼️ Visual Improvements
+- **Logo integration**: Added official integration logo for Home Assistant UI
+- **Icon support**: Created matching icon for entity displays
+- **Branding consistency**: Unified visual identity across all components
+
+## [2.3.1] - 2025-10-07
+### 🐛 Fixes
+- **Blocking I/O operations**: Resolved async/sync conflicts in downloader debug mode
+- **Data quality improvements**: Better handling of empty/NaN values with context-aware defaults
+- **Entity deduplication**: Fixed multiple entities per tariff by implementing offer-based grouping
+- **Unique ID generation**: Enhanced algorithm to prevent sensor duplication issues
+
+### ✨ Features
+- **Smart data cleaning**: Context-aware display formatting for different field types
+- **Robust URL discovery**: Multiple HTML parsing strategies with BeautifulSoup4 integration
+- **Dynamic versioning**: Automatic version management from manifest.json
+- **Enhanced logging**: Improved error handling and diagnostic information
+
+### 🔄 Changes
+- **Sensor consolidation**: One entity per offer with aggregated billing cycle data
+- **Dependency updates**: Added BeautifulSoup4 requirement for better HTML parsing
+- **ID simplification**: Streamlined unique ID generation for better maintainability
+
+## [2.2.1] - 2025-09-22
+
+### 🎨 Visual Enhancements
+- **Integration logo**: Added official logo support for professional appearance
+- **Documentation improvements**: Enhanced README with better examples and troubleshooting
+
+## [2.2.0] - 2025-09-22
+
+### 🔄 Automation Features
+- **Automatic scheduling**: Daily refresh at 11:00 AM local time
+- **Background updates**: Non-blocking data synchronization with ERSE servers
+- **Memory optimization**: Improved callback management and cleanup processes
+- **Fresh data guarantee**: Automatic sensor updates with latest CSV data
+
+## [2.0.1] - 2025-09-22
+
+### 🐛 Critical Fixes
+- **Timestamp handling**: Fixed device_class=timestamp using native datetime objects
+- **State consistency**: Improved sensor state management and reliability
+
+## [2.0.0] - 2025-09-22
+
+### 🚀 Major Architecture Overhaul
+- **Async pipeline**: Complete migration to aiohttp with async/await patterns  
+- **Non-blocking operations**: Eliminated synchronous requests that blocked event loop
+- **Enhanced sensor attributes**: All CSV columns exposed as normalized entity attributes
+- **Timestamp states**: Sensors now use proper timestamp device class with ISO8601 format
+- **Debug capabilities**: Comprehensive logging for data inspection and troubleshooting
+- **Manifest updates**: Added iot_class and integration_type specifications
 
 ## [1.5.0] - 2025-09-17
 
-### Fixed
-- Added `async_setup_entry` to `__init__.py` to support config flow setup and resolve integration setup errors.
+### 🔧 Integration Stability
+- **Config flow enhancement**: Added `async_setup_entry` to support proper config flow setup
+- **Setup error resolution**: Fixed integration initialization and entry creation issues
 
-### Changed
-- Incremented version to 1.5.0.
+### 📈 Version Management
+- **Semantic versioning**: Incremented to version 1.5.0 with proper changelog maintenance
 
 ## [1.4.0] - 2025-09-17
 
-### Fixed
-- Config flow now correctly creates the entry after selecting Potência contratada (`pot_cont`), allowing setup to complete.
+### 🎯 User Experience
+- **Config flow completion**: Fixed entry creation after power selection allowing successful setup
+- **Setup reliability**: Improved configuration flow stability and error handling
 
-### Changed
-- Incremented version to 1.4.0.
+### 📈 Version Management  
+- **Version increment**: Updated to 1.4.0 reflecting UX improvements
 
 ## [1.3.0] - 2025-09-17
 
-### Added
-- Config flow now presents a dropdown selector for Potência contratada (`pot_cont`) during integration setup.
+### ✨ UI Enhancements
+- **Power selector**: Added dropdown for "Potência contratada" during integration setup
+- **User guidance**: Improved setup flow with intuitive power selection interface
 
-### Changed
-- Incremented version to 1.3.0.
+### 📈 Version Management
+- **Version update**: Incremented to 1.3.0 for new UI features
 
 ## [1.2.0] - 2025-09-17
 
-### Changed
-- Updated README to clarify setup via Integrations UI, not configuration.yaml.
-- Improved documentation for installation and configuration steps.
-
-### Fixed
-- Minor documentation corrections.
+### 📚 Documentation Overhaul
+- **Setup clarification**: Updated README to emphasize Integrations UI over configuration.yaml
+- **Installation guide**: Improved step-by-step instructions for better user experience
+- **Minor corrections**: Fixed various documentation inconsistencies
 
 ## [1.1.0] - 2025-09-17
-### Changed
-- Fixed import for SensorEntity to use homeassistant.components.sensor for compatibility
-- Integrated DataFrame loading via data_loader module for cleaner entity setup
+
+### 🔧 Compatibility Improvements
+- **Import fixes**: Corrected SensorEntity import for Home Assistant compatibility
+- **Module integration**: Enhanced DataFrame loading via data_loader for cleaner setup
 
 ## [1.0.0] - 2025-09-17
-### Added
-- Initial release of Tarifários Eletricidade PT Home Assistant integration
-- Automatic download and processing of ERSE CSV data
-- Joins commercial conditions and price tables
-- Filters offers by contracted power (Pot_Cont)
-- Removes all columns related to gas (GN)
-- Creates a sensor entity for each offer (CODProposta)
-- Exposes all offer details as entity attributes
-- Enables tariff comparison and selection in Home Assistant
+
+### 🎉 Initial Release
+- **ERSE data integration**: Automatic download and processing of official Portuguese electricity tariff data
+- **Data joining**: Intelligent merge of commercial conditions and price tables
+- **Smart filtering**: Filter offers by contracted power (Pot_Cont) with automatic data cleanup
+- **Gas exclusion**: Automatic removal of natural gas (GN) related columns and offers
+- **Dynamic sensors**: One sensor entity per offer (CODProposta) with complete tariff details
+- **Rich attributes**: All offer conditions exposed as entity attributes for advanced automation
+- **Tariff comparison**: Enable side-by-side comparison and selection in Home Assistant
+- **Professional foundation**: Solid architecture for future enhancements and community contributions
+
+---
+
+## 📋 Version History Summary
+
+- **v2.4.0**: Major documentation revamp, professional branding, and submission preparation
+- **v2.3.x**: Logo integration, image optimization, and visual improvements  
+- **v2.2.x**: Automatic scheduling and background updates
+- **v2.1.x**: Timestamp handling and state management fixes
+- **v2.0.x**: Complete async architecture overhaul
+- **v1.x.x**: Foundation, UI improvements, and initial release
+
+For detailed technical information about each release, see the individual version sections above.
