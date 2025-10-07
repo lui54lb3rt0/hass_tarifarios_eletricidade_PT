@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.3.1 - 2025-10-07
+### Fixed
+- Fixed blocking I/O operation in downloader debug mode
+- Improved data cleaning to handle empty/NaN values better
+- Replace 'Unknown' values with more appropriate defaults (N/A, empty string, etc.)
+- Better handling of optional fields like Escalão and Operador de rede
+- Fixed multiple entities per tariff by grouping by offer code
+- Enhanced unique ID generation for sensors
+
+### Added
+- Context-aware display formatting for different field types
+- Enhanced HTML search for CSV URLs with multiple discovery strategies
+- BeautifulSoup4 requirement for better HTML parsing
+- Proper version management from manifest.json
+- Integration logo and icon for Home Assistant UI
+- Version update script for easier releases
+
+### Changed
+- Simplified unique ID generation (one entity per offer)
+- Merge billing cycle data into single entity attributes
+- Improved logging and error handling
+- Dynamic version loading from manifest.json
+
 ## 2.2.1 - 2025-09-22
 - Adicionado suporte para logotipo da integração.
 - Melhorias na documentação.

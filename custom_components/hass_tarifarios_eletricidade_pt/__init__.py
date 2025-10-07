@@ -4,8 +4,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 
-from .const import DOMAIN  # ensure DOMAIN = "hass_tarifarios_eletricidade_pt"
+from .const import DOMAIN, VERSION  # ensure DOMAIN = "hass_tarifarios_eletricidade_pt"
 from .data_loader import TarifariosDataUpdateCoordinator
+
+# Expose version for Home Assistant
+__version__ = VERSION
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
