@@ -2,7 +2,7 @@ import voluptuous as vol
 import logging
 from homeassistant import config_entries
 from homeassistant.helpers import config_validation as cv
-from .const import DOMAIN
+from .const import DOMAIN, ENERGY_TYPE_OPTIONS
 from .data_loader import async_get_comercializadores, async_get_offer_codes_for_comercializador
 
 _LOGGER = logging.getLogger(__name__)
@@ -710,10 +710,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize config flow."""
         self._comercializadores = []
         self._selected_comercializador = None
+        self._selected_energy_type = None
         self._available_offer_codes = []
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step - select comercializador."""
+        """Handle the initial step - select energy type and comercializador."""
         errors = {}
         
         if not self._comercializadores:
@@ -726,6 +727,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._selected_comercializador = user_input["comercializador"]
+            self._selected_energy_type = user_input["energy_type"]
             return await self.async_step_config()
 
         if errors.get("base"):
@@ -737,6 +739,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Required("comercializador"): vol.In(self._comercializadores),
+            vol.Required("energy_type", default="ele"): vol.In(ENERGY_TYPE_OPTIONS),
         })
 
         return self.async_show_form(
@@ -749,17 +752,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the configuration step - select power and codes."""
         errors = {}
         
-        # Fetch offer codes for the selected comercializador if not already done
-        if not self._available_offer_codes and self._selected_comercializador:
+        # Fetch offer codes for the selected comercializador and energy type if not already done
+        if not self._available_offer_codes and self._selected_comercializador and self._selected_energy_type:
             try:
                 self._available_offer_codes = await async_get_offer_codes_for_comercializador(
-                    self.hass, self._selected_comercializador
+                    self.hass, self._selected_comercializador, self._selected_energy_type
                 )
                 if not self._available_offer_codes:
-                    _LOGGER.warning("No offer codes found for %s", self._selected_comercializador)
+                    _LOGGER.warning("No offer codes found for %s (%s)", self._selected_comercializador, self._selected_energy_type)
                     self._available_offer_codes = []
             except Exception as e:
-                _LOGGER.error("Error fetching offer codes for %s: %s", self._selected_comercializador, e)
+                _LOGGER.error("Error fetching offer codes for %s (%s): %s", self._selected_comercializador, self._selected_energy_type, e)
                 errors["base"] = "cannot_connect"
 
         if user_input is not None:
@@ -769,11 +772,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             return self.async_create_entry(
-                title=self._selected_comercializador,
+                title=f"{self._selected_comercializador} ({ENERGY_TYPE_OPTIONS[self._selected_energy_type]})",
                 data={
                     "comercializador": self._selected_comercializador,
                     "pot_cont": user_input.get("pot_cont"),
-                    "codigos_oferta": user_input.get("codigos_oferta")
+                    "codigos_oferta": user_input.get("codigos_oferta"),
+                    "energy_type": self._selected_energy_type
                 },
             )
 
@@ -791,6 +795,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="config",
             data_schema=schema,
-            description_placeholders={"comercializador": self._selected_comercializador},
+            description_placeholders={
+                "comercializador": self._selected_comercializador,
+                "energy_type": ENERGY_TYPE_OPTIONS[self._selected_energy_type]
+            },
             errors=errors,
         )

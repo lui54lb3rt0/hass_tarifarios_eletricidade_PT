@@ -4,6 +4,14 @@ from pathlib import Path
 
 DOMAIN = "hass_tarifarios_eletricidade_pt"
 
+# Energy type options
+ENERGY_TYPE_OPTIONS = {
+    "ele": "Eletricidade apenas",
+    "gn": "Gás Natural apenas", 
+    "dual": "Eletricidade e Gás Natural",
+    "all": "Todos os tipos"
+}
+
 def get_version():
     """Get version from manifest.json."""
     try:

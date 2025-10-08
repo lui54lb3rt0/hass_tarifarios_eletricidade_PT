@@ -1,6 +1,6 @@
 # 📊 Tarifários de Eletricidade PT para Home Assistant
 
-[![versão](https://img.shields.io/badge/vers%C3%A3o-2.4.0-blue.svg)](https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT)
+[![versão](https://img.shields.io/badge/vers%C3%A3o-2.5.0-blue.svg)](https://github.com/lui54lb3rt0/hass_tarifarios_eletricidade_PT)
 [![hacs_badge](https://img.shields.io/badge/HACS-Personalizado-orange.svg)](https://github.com/custom-components/hacs)
 [![Licença](https://img.shields.io/github/license/lui54lb3rt0/hass_tarifarios_eletricidade_PT.svg)](LICENSE)
 
@@ -18,8 +18,9 @@ Integração personalizada avançada que liga o Home Assistant diretamente aos d
 
 ### 📈 **Processamento Avançado de Dados**
 - **Junção automática**: CondComerciais.csv + Precos_ELEGN.csv
-- **Filtros inteligentes**: Por potência contratada e códigos de oferta
-- **Limpeza de dados**: Remove ofertas de gás, normaliza valores automaticamente
+- **Filtros inteligentes**: Por potência contratada, códigos de oferta e tipo de energia
+- **Tipos de energia suportados**: Eletricidade, Gás Natural, ofertas Duais ou todos os tipos
+- **Limpeza de dados**: Remove ofertas desnecessárias, normaliza valores automaticamente
 - **Agregação**: Uma entidade por oferta com dados de todos os ciclos de faturação
 
 ### 🏠 **Integração Nativa no Home Assistant**
@@ -77,14 +78,20 @@ Integração personalizada avançada que liga o Home Assistant diretamente aos d
 
 2. **Configurar Parâmetros**:
 
+   **⚡ Tipo de Energia** (obrigatório)
+   - `Eletricidade apenas`: Apenas ofertas de eletricidade (padrão)
+   - `Gás Natural apenas`: Apenas ofertas de gás natural
+   - `Eletricidade e Gás Natural`: Ofertas duais (eletricidade + gás)
+   - `Todos os tipos`: Todas as ofertas disponíveis
+
    **🔌 Potência Contratada** (obrigatório)
    - Formato aceito: `5.75` ou `5,75`
    - Exemplos comuns: `3.45`, `5.75`, `6.90`, `10.35`, `13.80`
 
-   **📋 Códigos de Oferta** (obrigatório)
+   **📋 Códigos de Oferta** (opcional)
    - Um ou vários códigos separados por vírgula
    - Exemplo: `ENIHD.RE.DD.VE.CG.01, GALPENERGIADOMESTICOREGIME1`
-   - Deixar vazio para carregar todas as ofertas disponíveis
+   - Deixar vazio para carregar todas as ofertas disponíveis para o tipo de energia selecionado
 
 ### Resultado da Configuração
 - **Sensores criados**: Um por cada oferta tarifária
@@ -239,13 +246,15 @@ R: A ERSE atualiza os dados conforme necessário. A integração verifica diaria
 
 ## 📈 Plano de Desenvolvimento e Funcionalidades Futuras
 
-### ✅ Implementado (v2.4.0)
+### ✅ Implementado (v2.5.0)
 - ✅ Sincronização automática diária
 - ✅ Descoberta inteligente de URLs
 - ✅ Sistema robusto de redundância  
 - ✅ Agregação por oferta (uma entidade por tarifa)
 - ✅ Logótipo e controlo de versões profissional
 - ✅ Processamento assíncrono completo
+- ✅ **Seleção de tipo de energia** (Eletricidade, Gás Natural, Dual, Todos)
+- ✅ **Filtros flexíveis** para diferentes necessidades energéticas
 
 ### 🔄 Em Desenvolvimento
 - 🔄 Adição dinâmica de ofertas sem recarregamento

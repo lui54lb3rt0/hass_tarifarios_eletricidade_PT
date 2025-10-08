@@ -145,12 +145,12 @@ async def async_get_comercializadores(hass: HomeAssistant) -> list[str]:
         return []
 
 
-async def async_get_offer_codes_for_comercializador(hass: HomeAssistant, comercializador: str) -> list[str]:
-    """Get list of offer codes available for a specific comercializador."""
+async def async_get_offer_codes_for_comercializador(hass: HomeAssistant, comercializador: str, energy_type: str = "ele") -> list[str]:
+    """Get list of offer codes available for a specific comercializador and energy type."""
     try:
-        df = await async_process_csv(hass, comercializador=comercializador)
+        df = await async_process_csv(hass, comercializador=comercializador, energy_type=energy_type)
         if df.empty:
-            _LOGGER.warning("No data available for comercializador %s", comercializador)
+            _LOGGER.warning("No data available for comercializador %s with energy type %s", comercializador, energy_type)
             return []
         
         # Look for the offer code column (mapped name)
@@ -161,11 +161,11 @@ async def async_get_offer_codes_for_comercializador(hass: HomeAssistant, comerci
         
         # Get unique offer codes, sorted
         offer_codes = sorted(df[code_col].dropna().unique().tolist())
-        _LOGGER.debug("Found %d offer codes for %s: %s", len(offer_codes), comercializador, offer_codes)
+        _LOGGER.debug("Found %d offer codes for %s (%s): %s", len(offer_codes), comercializador, energy_type, offer_codes)
         return offer_codes
     
     except Exception as e:
-        _LOGGER.error("Error extracting offer codes for %s: %s", comercializador, e)
+        _LOGGER.error("Error extracting offer codes for %s (%s): %s", comercializador, energy_type, e)
         return []
 
 async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
@@ -181,7 +181,7 @@ async def _async_read(csv_text: str, label: str) -> pd.DataFrame:
     _LOGGER.warning("%s empty/unparsable", label)
     return pd.DataFrame()
 
-async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None, pot_cont=None) -> pd.DataFrame:
+async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comercializador=None, pot_cont=None, energy_type="ele") -> pd.DataFrame:
     try:
         # Use new downloader instead of GitHub URLs
         _LOGGER.debug("Downloading and extracting CSV files from ERSE...")
@@ -224,16 +224,28 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
         if pot_col in merged.columns:
             merged[f"{pot_col}__norm"] = _normalize_pot_val(merged[pot_col])
 
-    # Filter ELE (use startswith to be tolerant)
+    # Filter by energy type (ELE, GN, Dual, or All)
     fornec_col = next((c for c in FORNECIMENTO_COLS if c in merged.columns), None)
-    if fornec_col:
+    if fornec_col and energy_type != "all":
         before = len(merged)
         uniques = sorted(set(merged[fornec_col].dropna().str.strip().str.upper()))
-        _LOGGER.debug("Fornecimento uniques before: %s", uniques)
-        merged = merged[merged[fornec_col].str.upper().fillna("").str.strip().str.startswith("ELE")]
-        _LOGGER.debug("ELE filter %d -> %d", before, len(merged))
+        _LOGGER.debug("Fornecimento uniques before filter: %s", uniques)
+        
+        if energy_type == "ele":
+            # Only electricity offers
+            merged = merged[merged[fornec_col].str.upper().fillna("").str.strip().str.startswith("ELE")]
+            _LOGGER.debug("ELE filter %d -> %d", before, len(merged))
+        elif energy_type == "gn": 
+            # Only gas offers
+            merged = merged[merged[fornec_col].str.upper().fillna("").str.strip().str.startswith("GN")]
+            _LOGGER.debug("GN filter %d -> %d", before, len(merged))
+        elif energy_type == "dual":
+            # Both electricity and gas (dual offers)
+            merged = merged[merged[fornec_col].str.upper().fillna("").str.strip().isin(["ELE", "DUAL"])]
+            _LOGGER.debug("ELE+DUAL filter %d -> %d", before, len(merged))
+        
         if merged.empty:
-            _LOGGER.warning("All rows removed by ELE filter. Keeping original (skipping filter).")
+            _LOGGER.warning("All rows removed by energy type filter (%s). Keeping original (skipping filter).", energy_type)
             merged = cond_df.copy()
 
     # Filter by selected codes
@@ -296,11 +308,12 @@ async def async_process_csv(hass: HomeAssistant, codigos_oferta=None, comerciali
 class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Tarifarios data from ERSE."""
 
-    def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None, pot_cont=None):
+    def __init__(self, hass: HomeAssistant, comercializador=None, codigos_oferta=None, pot_cont=None, energy_type="ele"):
         """Initialize."""
         self.comercializador = comercializador
         self.codigos_oferta = codigos_oferta
         self.pot_cont = pot_cont
+        self.energy_type = energy_type
         super().__init__(
             hass,
             _LOGGER,
@@ -313,18 +326,19 @@ class TarifariosDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            _LOGGER.debug("Fetching data from ERSE for %s (power: %s)...", 
-                        self.comercializador or "all", self.pot_cont or "all")
+            _LOGGER.debug("Fetching data from ERSE for %s (power: %s, energy: %s)...", 
+                        self.comercializador or "all", self.pot_cont or "all", self.energy_type)
             data = await async_process_csv(
                 self.hass, 
                 codigos_oferta=self.codigos_oferta,
                 comercializador=self.comercializador,
-                pot_cont=self.pot_cont
+                pot_cont=self.pot_cont,
+                energy_type=self.energy_type
             )
             if data is None or data.empty:
                 raise UpdateFailed("Failed to fetch data or data is empty")
-            _LOGGER.info("Successfully fetched %d records from ERSE for %s (power: %s)", 
-                        len(data), self.comercializador or "all", self.pot_cont or "all")
+            _LOGGER.info("Successfully fetched %d records from ERSE for %s (power: %s, energy: %s)", 
+                        len(data), self.comercializador or "all", self.pot_cont or "all", self.energy_type)
             return data
         except Exception as exception:
             _LOGGER.error("Error fetching data: %s", exception)

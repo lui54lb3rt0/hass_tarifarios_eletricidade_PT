@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2025-10-08
+
+### 🚀 Major Features
+- **Energy type selection**: Users can now choose between electricity only (ELE), gas only (GN), dual offers (ELE+GN), or all types during setup
+- **Enhanced filtering**: Improved energy type filtering logic to support gas natural and dual offers
+- **Flexible configuration**: New configuration option allows users to access previously filtered out dual electricity+gas packages
+
+### ✨ Enhancements
+- **Backward compatibility**: Existing installations default to electricity-only filtering to maintain current behavior
+- **Enhanced logging**: Added energy type information to debug logs and coordinator status
+- **Improved config flow**: Two-step configuration with energy type selection before offer code fetching
+- **Dynamic offer codes**: Offer codes are now fetched based on selected energy type for better accuracy
+
+### 🔧 Technical Improvements
+- **Config flow enhancement**: Updated to collect energy type preference during initial setup
+- **Data loader updates**: Enhanced `async_process_csv` function to support all energy type filtering modes
+- **Coordinator updates**: Extended coordinator to handle energy type parameter throughout the data pipeline
+- **Constants addition**: Added `ENERGY_TYPE_OPTIONS` for consistent energy type handling
+
+### 📚 Configuration Options
+- **Eletricidade apenas**: Traditional electricity-only offers (default for backward compatibility)
+- **Gás Natural apenas**: Gas-only offers for users with gas-only needs
+- **Eletricidade e Gás Natural**: Dual offers combining both electricity and gas services
+- **Todos os tipos**: All available offers regardless of energy type
+
+### 🔄 Migration Notes
+- **Existing users**: No action required - will continue using electricity-only filtering
+- **New installations**: Can choose preferred energy type during setup
+- **Reconfiguration**: Remove and re-add integration to change energy type preference
+
 ## [2.4.0] - 2025-10-07
 
 ### 🚀 Major Features

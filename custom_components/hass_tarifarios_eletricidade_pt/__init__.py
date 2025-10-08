@@ -23,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Extract configuration from config entry
     comercializador = entry.data.get("comercializador")
     pot_cont = entry.data.get("pot_cont")
+    energy_type = entry.data.get("energy_type", "ele")  # Default to electricity only for backward compatibility
     sel_codes = entry.data.get("codigos_oferta")
     if isinstance(sel_codes, str):
         sel_codes = [c.strip() for c in sel_codes.split(",") if c.strip()]
@@ -32,7 +33,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass, 
         comercializador=comercializador,
         codigos_oferta=sel_codes,
-        pot_cont=pot_cont
+        pot_cont=pot_cont,
+        energy_type=energy_type
     )
     
     # Fetch initial data
